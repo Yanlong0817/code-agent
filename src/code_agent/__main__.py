@@ -9,6 +9,7 @@ from rich.prompt import Prompt
 
 from code_agent.agent import CodeAgent
 from code_agent.config import Config
+from code_agent.logging import setup_logging
 
 
 async def run_interactive(agent: CodeAgent, console: Console) -> None:
@@ -58,6 +59,9 @@ def main() -> None:
     except ValueError as e:
         console.print(f"[red]配置错误：{e}[/red]")
         sys.exit(1)
+
+    # 初始化日志系统
+    setup_logging(level=config.log_level, log_file=config.log_file)
 
     agent = CodeAgent(config)
 

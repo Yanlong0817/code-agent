@@ -1,9 +1,13 @@
 """使用 Pydantic Settings 进行配置管理。"""
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 日志级别类型
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class Config(BaseSettings):
@@ -61,6 +65,16 @@ class Config(BaseSettings):
         default=False,
         description="启用详细输出",
         alias="CODE_AGENT_VERBOSE",
+    )
+    log_level: LogLevel = Field(
+        default="INFO",
+        description="日志级别（DEBUG、INFO、WARNING、ERROR、CRITICAL）",
+        alias="CODE_AGENT_LOG_LEVEL",
+    )
+    log_file: Path | None = Field(
+        default=None,
+        description="日志文件路径（可选）",
+        alias="CODE_AGENT_LOG_FILE",
     )
 
     def validate_required(self) -> None:

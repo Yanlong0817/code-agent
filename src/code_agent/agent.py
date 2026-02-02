@@ -8,11 +8,15 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from code_agent.config import Config
+from code_agent.logging import get_logger
 from code_agent.tools.base import ToolRegistry
 from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, ReadTool, WriteTool
 from code_agent.tools.network import WebFetchTool, WebSearchTool
 from code_agent.tools.system import AskUserQuestionTool, BashTool
 from code_agent.tools.task import TodoWriteTool
+
+# 获取模块日志记录器
+logger = get_logger("agent")
 
 
 class CodeAgent:
@@ -40,6 +44,8 @@ class CodeAgent:
         self.config = config or Config.from_env()
         self.config.validate_required()
 
+        logger.info("初始化 CodeAgent，模型: %s", self.config.model)
+
         self.client = anthropic.Anthropic(
             api_key=self.config.anthropic_api_key,
             base_url=self.config.anthropic_base_url,
@@ -50,6 +56,7 @@ class CodeAgent:
         # 初始化工具
         self.registry = ToolRegistry()
         self._register_tools()
+        logger.debug("已注册 %d 个工具", len(self.registry.get_all()))
 
     def _register_tools(self) -> None:
         """注册所有可用工具。"""
@@ -81,6 +88,8 @@ class CodeAgent:
         Returns:
             最终的助手响应
         """
+        logger.info("开始处理用户请求")
+        logger.debug("用户输入: %s", user_input[:100] + "..." if len(user_input) > 100 else user_input)
         self.messages.append({"role": "user", "content": user_input})
 
         iteration = 0
@@ -88,12 +97,15 @@ class CodeAgent:
 
         while iteration < self.config.max_iterations:
             iteration += 1
+            logger.debug("迭代 %d/%d", iteration, self.config.max_iterations)
 
             if self.config.verbose:
                 self.console.print(f"[dim]迭代 {iteration}[/dim]")
 
             # 调用 Claude API
+            logger.debug("调用 Claude API")
             response = self._call_api()
+            logger.debug("API 响应停止原因: %s", response.stop_reason)
 
             # 处理响应内容
             assistant_content = []
@@ -122,6 +134,7 @@ class CodeAgent:
 
             # 检查停止原因
             if response.stop_reason == "end_turn":
+                logger.info("Agent 完成处理，共 %d 次迭代", iteration)
                 break
 
             # 执行工具调用
@@ -168,6 +181,8 @@ class CodeAgent:
                 input_str = json.dumps(tool_input, indent=2, ensure_ascii=False)
                 self.console.print(f"[dim]输入：{input_str}[/dim]")
 
+            logger.debug("执行工具: %s", tool_name)
+
             try:
                 # 执行工具
                 result = await self.registry.execute(tool_name, **tool_input)
@@ -175,6 +190,8 @@ class CodeAgent:
                 # 如果需要，将结果转换为字符串
                 if not isinstance(result, str):
                     result = json.dumps(result, indent=2, ensure_ascii=False)
+
+                logger.debug("工具 %s 执行成功", tool_name)
 
                 results.append(
                     {
@@ -189,6 +206,7 @@ class CodeAgent:
 
             except Exception as e:
                 error_msg = f"执行 {tool_name} 时出错：{str(e)}"
+                logger.error("工具执行失败: %s - %s", tool_name, str(e))
                 self.console.print(f"[red]{error_msg}[/red]")
 
                 results.append(

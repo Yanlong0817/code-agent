@@ -4,6 +4,7 @@ __version__ = "0.1.0"
 
 from code_agent.agent import CodeAgent
 from code_agent.config import Config
+from code_agent.logging import get_logger, setup_logging
 from code_agent.tools import (
     AskUserQuestionTool,
     BaseTool,
@@ -23,6 +24,9 @@ __all__ = [
     # 核心
     "CodeAgent",
     "Config",
+    # 日志
+    "setup_logging",
+    "get_logger",
     # 工具基类
     "BaseTool",
     "ToolRegistry",
