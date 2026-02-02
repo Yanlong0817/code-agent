@@ -5,6 +5,8 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 from rich.console import Console
+from rich.live import Live
+from rich.markdown import Markdown
 
 from code_agent.config import Config
 from code_agent.logging import get_logger
@@ -144,13 +146,12 @@ class CodeAgent:
         return final_response
 
     async def _call_api_stream(self) -> tuple[Any, str]:
-        """使用流式 API 调用 Claude，实时输出文本。
+        """使用流式 API 调用 Claude，实时渲染 Markdown 输出。
 
         Returns:
             (最终消息对象, 累积的文本内容)
         """
         accumulated_text = ""
-        self.console.print()  # 开始前换行
 
         async with self.client.messages.stream(
             model=self.config.model,
@@ -159,16 +160,15 @@ class CodeAgent:
             tools=self.registry.get_schemas(),
             messages=self.messages,
         ) as stream:
-            # 流式输出文本
-            async for text in stream.text_stream:
-                self.console.print(text, end="")
-                accumulated_text += text
+            # 使用 Rich Live 实时渲染 Markdown
+            with Live(Markdown(""), console=self.console, refresh_per_second=10) as live:
+                async for text in stream.text_stream:
+                    accumulated_text += text
+                    # 实时更新 Markdown 渲染
+                    live.update(Markdown(accumulated_text))
 
             # 获取最终消息
             response = await stream.get_final_message()
-
-        if accumulated_text:
-            self.console.print()  # 结束后换行
 
         return response, accumulated_text
 
