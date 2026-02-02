@@ -3,9 +3,8 @@
 import json
 from typing import Any
 
-import anthropic
+from anthropic import AsyncAnthropic
 from rich.console import Console
-from rich.markdown import Markdown
 
 from code_agent.config import Config
 from code_agent.logging import get_logger
@@ -46,7 +45,7 @@ class CodeAgent:
 
         logger.info("初始化 CodeAgent，模型: %s", self.config.model)
 
-        self.client = anthropic.Anthropic(
+        self.client = AsyncAnthropic(
             api_key=self.config.anthropic_api_key,
             base_url=self.config.anthropic_base_url,
         )
@@ -103,22 +102,21 @@ class CodeAgent:
             if self.config.verbose:
                 self.console.print(f"[dim]迭代 {iteration}[/dim]")
 
-            # 调用 Claude API
-            logger.debug("调用 Claude API")
-            response = self._call_api()
+            # 调用 Claude API（流式）
+            logger.debug("调用 Claude API（流式）")
+            response, text_content = await self._call_api_stream()
             logger.debug("API 响应停止原因: %s", response.stop_reason)
 
-            # 处理响应内容
+            if text_content:
+                final_response = text_content
+
+            # 从响应中提取工具调用
             assistant_content = []
             tool_calls = []
 
             for block in response.content:
                 if block.type == "text":
-                    # 向用户显示文本
-                    self._display_text(block.text)
                     assistant_content.append({"type": "text", "text": block.text})
-                    final_response = block.text
-
                 elif block.type == "tool_use":
                     tool_calls.append(block)
                     assistant_content.append(
@@ -145,22 +143,37 @@ class CodeAgent:
 
         return final_response
 
-    def _call_api(self) -> anthropic.types.Message:
-        """使用当前消息调用 Claude API。
+    async def _call_api_stream(self) -> tuple[Any, str]:
+        """使用流式 API 调用 Claude，实时输出文本。
 
         Returns:
-            API 响应消息
+            (最终消息对象, 累积的文本内容)
         """
-        return self.client.messages.create(
+        accumulated_text = ""
+        self.console.print()  # 开始前换行
+
+        async with self.client.messages.stream(
             model=self.config.model,
             max_tokens=self.config.max_tokens,
             system=self.SYSTEM_PROMPT,
             tools=self.registry.get_schemas(),
             messages=self.messages,
-        )
+        ) as stream:
+            # 流式输出文本
+            async for text in stream.text_stream:
+                self.console.print(text, end="")
+                accumulated_text += text
+
+            # 获取最终消息
+            response = await stream.get_final_message()
+
+        if accumulated_text:
+            self.console.print()  # 结束后换行
+
+        return response, accumulated_text
 
     async def _execute_tool_calls(
-        self, tool_calls: list[anthropic.types.ToolUseBlock]
+        self, tool_calls: list[Any]
     ) -> list[dict[str, Any]]:
         """执行工具调用并返回结果。
 
@@ -220,16 +233,6 @@ class CodeAgent:
                 )
 
         return results
-
-    def _display_text(self, text: str) -> None:
-        """向用户显示文本响应。
-
-        Args:
-            text: 要显示的文本
-        """
-        self.console.print()
-        self.console.print(Markdown(text))
-        self.console.print()
 
     def reset(self) -> None:
         """重置对话历史。"""
