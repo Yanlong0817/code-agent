@@ -11,7 +11,7 @@ from code_agent.commands.base import BaseCommand
 # 可用的模型列表
 AVAILABLE_MODELS = [
     ("claude-sonnet-4-20250514", "Claude Sonnet 4 - 平衡性能与成本"),
-    ("claude-opus-4-5-20251101", "Claude Opus 4.5 - 最强大的模型")
+    ("claude-opus-4-5-20251101", "Claude Opus 4.5 - 最强大的模型"),
 ]
 
 
