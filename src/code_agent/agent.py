@@ -172,9 +172,7 @@ class CodeAgent:
 
         return response, accumulated_text
 
-    async def _execute_tool_calls(
-        self, tool_calls: list[Any]
-    ) -> list[dict[str, Any]]:
+    async def _execute_tool_calls(self, tool_calls: list[Any]) -> list[dict[str, Any]]:
         """执行工具调用并返回结果。
 
         Args:
