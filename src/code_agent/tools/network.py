@@ -1,14 +1,15 @@
 """网络工具：WebFetch、WebSearch。"""
 
 from typing import Any, ClassVar, Literal
-from urllib.parse import urlparse
 
 import html2text
 import httpx
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
+
+from code_agent.tools.base import BaseTool
 
 
-class WebFetchTool:
+class WebFetchTool(BaseTool):
     """获取并处理网页内容。"""
 
     name: ClassVar[str] = "WebFetch"
@@ -31,18 +32,6 @@ class WebFetchTool:
         self.html_converter.ignore_images = True
         self.html_converter.ignore_emphasis = False
         self.html_converter.body_width = 0  # 不换行
-
-    @classmethod
-    def get_schema(cls) -> dict[str, Any]:
-        """生成 Claude API 工具 schema。"""
-        json_schema = cls.Input.model_json_schema()
-        json_schema.pop("title", None)
-        json_schema.pop("$defs", None)
-        return {
-            "name": cls.name,
-            "description": cls.description,
-            "input_schema": json_schema,
-        }
 
     async def execute(
         self,
@@ -97,13 +86,8 @@ class WebFetchTool:
 
             return result
 
-    async def __call__(self, **kwargs: Any) -> Any:
-        """允许直接调用工具实例。"""
-        validated = self.Input(**kwargs)
-        return await self.execute(**validated.model_dump())
 
-
-class WebSearchTool:
+class WebSearchTool(BaseTool):
     """使用 Tavily API 进行网络搜索。"""
 
     name: ClassVar[str] = "WebSearch"
@@ -131,18 +115,6 @@ class WebSearchTool:
 
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key
-
-    @classmethod
-    def get_schema(cls) -> dict[str, Any]:
-        """生成 Claude API 工具 schema。"""
-        json_schema = cls.Input.model_json_schema()
-        json_schema.pop("title", None)
-        json_schema.pop("$defs", None)
-        return {
-            "name": cls.name,
-            "description": cls.description,
-            "input_schema": json_schema,
-        }
 
     async def execute(
         self,
@@ -210,8 +182,3 @@ class WebSearchTool:
             lines.append("---\n")
 
         return "\n".join(lines)
-
-    async def __call__(self, **kwargs: Any) -> Any:
-        """允许直接调用工具实例。"""
-        validated = self.Input(**kwargs)
-        return await self.execute(**validated.model_dump())

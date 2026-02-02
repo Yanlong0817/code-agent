@@ -220,7 +220,7 @@ class GrepTool(BaseTool):
     name: ClassVar[str] = "Grep"
     description: ClassVar[str] = (
         "使用正则表达式模式搜索文件内容（基于 ripgrep）。"
-        "支持按文件类型或 glob 模式过滤。"
+        "支持按文件类型或 glob 模式过滤。默认返回匹配的文件列表。"
     )
 
     class Input(BaseModel):

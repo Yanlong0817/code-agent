@@ -11,6 +11,37 @@ from code_agent.agent import CodeAgent
 from code_agent.config import Config
 
 
+async def run_interactive(agent: CodeAgent, console: Console) -> None:
+    """运行交互模式。
+
+    Args:
+        agent: CodeAgent 实例
+        console: Rich Console 实例
+    """
+    console.print("[dim]输入你的请求，或输入 'quit' 退出。[/dim]\n")
+
+    while True:
+        try:
+            # 在线程池中运行同步的 Prompt.ask，避免阻塞事件循环
+            user_input = await asyncio.to_thread(
+                Prompt.ask, "[bold green]>[/bold green]"
+            )
+
+            if user_input.lower() in ("quit", "exit", "q"):
+                console.print("[dim]再见！[/dim]")
+                break
+
+            if not user_input.strip():
+                continue
+
+            await agent.run(user_input)
+
+        except KeyboardInterrupt:
+            console.print("\n[dim]已中断。输入 'quit' 退出。[/dim]")
+        except Exception as e:
+            console.print(f"[red]错误：{e}[/red]")
+
+
 def main() -> None:
     """CLI 主入口函数。"""
     console = Console()
@@ -39,26 +70,8 @@ def main() -> None:
         asyncio.run(agent.run(user_input))
         return
 
-    # 交互模式
-    console.print("[dim]输入你的请求，或输入 'quit' 退出。[/dim]\n")
-
-    while True:
-        try:
-            user_input = Prompt.ask("[bold green]>[/bold green]")
-
-            if user_input.lower() in ("quit", "exit", "q"):
-                console.print("[dim]再见！[/dim]")
-                break
-
-            if not user_input.strip():
-                continue
-
-            asyncio.run(agent.run(user_input))
-
-        except KeyboardInterrupt:
-            console.print("\n[dim]已中断。输入 'quit' 退出。[/dim]")
-        except Exception as e:
-            console.print(f"[red]错误：{e}[/red]")
+    # 交互模式 - 使用单一事件循环
+    asyncio.run(run_interactive(agent, console))
 
 
 if __name__ == "__main__":

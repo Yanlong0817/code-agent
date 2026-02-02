@@ -5,11 +5,14 @@ from typing import Any, ClassVar, Literal
 from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
+
+from code_agent.tools.base import BaseTool
 
 
 class TodoItem(BaseModel):
     """单个待办事项。"""
+
+    model_config = {"populate_by_name": True}
 
     content: str = Field(description="任务描述（祈使句形式）")
     status: Literal["pending", "in_progress", "completed"] = Field(
@@ -20,11 +23,8 @@ class TodoItem(BaseModel):
         description="进行时形式（如 '正在运行测试'）",
     )
 
-    class Config:
-        populate_by_name = True
 
-
-class TodoWriteTool:
+class TodoWriteTool(BaseTool):
     """管理待办事项列表以跟踪任务进度。"""
 
     name: ClassVar[str] = "TodoWrite"
@@ -39,18 +39,6 @@ class TodoWriteTool:
     def __init__(self) -> None:
         self.console = Console()
         self.todos: list[TodoItem] = []
-
-    @classmethod
-    def get_schema(cls) -> dict[str, Any]:
-        """生成 Claude API 工具 schema。"""
-        json_schema = cls.Input.model_json_schema()
-        json_schema.pop("title", None)
-        # 保留 $defs 以供 TodoItem 引用
-        return {
-            "name": cls.name,
-            "description": cls.description,
-            "input_schema": json_schema,
-        }
 
     async def execute(self, todos: list[dict[str, Any]]) -> str:
         """更新并显示待办事项列表。
@@ -119,8 +107,3 @@ class TodoWriteTool:
             if todo.status == "in_progress":
                 return todo
         return None
-
-    async def __call__(self, **kwargs: Any) -> Any:
-        """允许直接调用工具实例。"""
-        validated = self.Input(**kwargs)
-        return await self.execute([t.model_dump() for t in validated.todos])

@@ -1,7 +1,7 @@
 """系统交互工具：Bash、AskUserQuestion。"""
 
 import asyncio
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 from rich.console import Console
@@ -9,8 +9,10 @@ from rich.prompt import Prompt
 from rich.panel import Panel
 from rich.table import Table
 
+from code_agent.tools.base import BaseTool
 
-class BashTool:
+
+class BashTool(BaseTool):
     """执行 shell 命令。"""
 
     name: ClassVar[str] = "Bash"
@@ -30,18 +32,6 @@ class BashTool:
         working_dir: str | None = Field(
             default=None, description="命令执行的工作目录"
         )
-
-    @classmethod
-    def get_schema(cls) -> dict[str, Any]:
-        """生成 Claude API 工具 schema。"""
-        json_schema = cls.Input.model_json_schema()
-        json_schema.pop("title", None)
-        json_schema.pop("$defs", None)
-        return {
-            "name": cls.name,
-            "description": cls.description,
-            "input_schema": json_schema,
-        }
 
     async def execute(
         self,
@@ -102,13 +92,8 @@ class BashTool:
         except asyncio.TimeoutError:
             raise TimeoutError(f"命令超时（{timeout_seconds} 秒）")
 
-    async def __call__(self, **kwargs: Any) -> Any:
-        """允许直接调用工具实例。"""
-        validated = self.Input(**kwargs)
-        return await self.execute(**validated.model_dump())
 
-
-class AskUserQuestionTool:
+class AskUserQuestionTool(BaseTool):
     """交互式向用户提问。"""
 
     name: ClassVar[str] = "AskUserQuestion"
@@ -137,18 +122,6 @@ class AskUserQuestionTool:
 
     def __init__(self) -> None:
         self.console = Console()
-
-    @classmethod
-    def get_schema(cls) -> dict[str, Any]:
-        """生成 Claude API 工具 schema。"""
-        json_schema = cls.Input.model_json_schema()
-        json_schema.pop("title", None)
-        json_schema.pop("$defs", None)
-        return {
-            "name": cls.name,
-            "description": cls.description,
-            "input_schema": json_schema,
-        }
 
     async def execute(self, questions: list[dict[str, Any]]) -> dict[str, str]:
         """提问并收集答案。
@@ -223,8 +196,3 @@ class AskUserQuestionTool:
                     self.console.print("[red]输入无效，请重试[/red]")
 
         return answers
-
-    async def __call__(self, **kwargs: Any) -> Any:
-        """允许直接调用工具实例。"""
-        validated = self.Input(**kwargs)
-        return await self.execute(validated.model_dump()["questions"])
