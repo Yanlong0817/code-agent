@@ -14,8 +14,7 @@ class WebFetchTool(BaseTool):
 
     name: ClassVar[str] = "WebFetch"
     description: ClassVar[str] = (
-        "从 URL 获取内容并将 HTML 转换为 Markdown。"
-        "用于获取文档、网页或 API 响应。"
+        "从 URL 获取内容并将 HTML 转换为 Markdown。用于获取文档、网页或 API 响应。"
     )
 
     class Input(BaseModel):
@@ -109,9 +108,7 @@ class WebSearchTool(BaseTool):
             default_factory=list,
             description="排除这些域名的结果",
         )
-        max_results: int = Field(
-            default=5, gt=0, le=20, description="最大结果数量"
-        )
+        max_results: int = Field(default=5, gt=0, le=20, description="最大结果数量")
 
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key

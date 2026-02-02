@@ -1,9 +1,8 @@
 """文件操作工具：Read、Write、Edit、Glob、Grep。"""
 
 import asyncio
-import os
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, Field
 
@@ -15,8 +14,7 @@ class ReadTool(BaseTool):
 
     name: ClassVar[str] = "Read"
     description: ClassVar[str] = (
-        "从文件系统读取文件。返回带行号的文件内容。"
-        "支持使用 offset 和 limit 参数读取指定行范围。"
+        "从文件系统读取文件。返回带行号的文件内容。支持使用 offset 和 limit 参数读取指定行范围。"
     )
 
     class Input(BaseModel):
@@ -69,8 +67,7 @@ class WriteTool(BaseTool):
 
     name: ClassVar[str] = "Write"
     description: ClassVar[str] = (
-        "将内容写入文件。如果文件不存在则创建，"
-        "如果存在则覆盖。必要时创建父目录。"
+        "将内容写入文件。如果文件不存在则创建，如果存在则覆盖。必要时创建父目录。"
     )
 
     class Input(BaseModel):
@@ -103,8 +100,7 @@ class EditTool(BaseTool):
 
     name: ClassVar[str] = "Edit"
     description: ClassVar[str] = (
-        "在文件中执行精确的字符串替换。"
-        "除非 replace_all 为 True，否则 old_string 必须在文件中唯一。"
+        "在文件中执行精确的字符串替换。除非 replace_all 为 True，否则 old_string 必须在文件中唯一。"
     )
 
     class Input(BaseModel):
@@ -169,8 +165,7 @@ class GlobTool(BaseTool):
 
     name: ClassVar[str] = "Glob"
     description: ClassVar[str] = (
-        "使用 glob 模式（如 '**/*.py'）进行快速文件模式匹配。"
-        "返回按修改时间排序的匹配文件路径。"
+        "使用 glob 模式（如 '**/*.py'）进行快速文件模式匹配。返回按修改时间排序的匹配文件路径。"
     )
 
     class Input(BaseModel):
@@ -230,7 +225,7 @@ class GrepTool(BaseTool):
         file_type: str | None = Field(default=None, description="要搜索的文件类型（如 'py'、'js'）")
         output_mode: Literal["content", "files_with_matches", "count"] = Field(
             default="files_with_matches",
-            description="输出模式：'content' 显示行，'files_with_matches' 显示路径，'count' 显示计数",
+            description="输出模式：content 显示行，files_with_matches 显示路径，count 显示计数",
         )
         context_lines: int = Field(default=0, ge=0, le=10, description="匹配周围的上下文行数")
         case_insensitive: bool = Field(default=False, description="不区分大小写搜索")
@@ -309,5 +304,5 @@ class GrepTool(BaseTool):
 
         except FileNotFoundError:
             raise RuntimeError("ripgrep (rg) 未安装。请先安装它。")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise RuntimeError("搜索超时（30 秒）")

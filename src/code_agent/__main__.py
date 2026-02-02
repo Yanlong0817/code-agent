@@ -23,9 +23,7 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
     while True:
         try:
             # 在线程池中运行同步的 Prompt.ask，避免阻塞事件循环
-            user_input = await asyncio.to_thread(
-                Prompt.ask, "[bold green]>[/bold green]"
-            )
+            user_input = await asyncio.to_thread(Prompt.ask, "[bold green]>[/bold green]")
 
             if user_input.lower() in ("quit", "exit", "q"):
                 console.print("[dim]再见！[/dim]")
@@ -49,8 +47,7 @@ def main() -> None:
     # 显示横幅
     console.print(
         Panel.fit(
-            "[bold cyan]Code Agent[/bold cyan]\n"
-            "[dim]基于 Claude 的智能代码助手[/dim]",
+            "[bold cyan]Code Agent[/bold cyan]\n[dim]基于 Claude 的智能代码助手[/dim]",
             border_style="cyan",
         )
     )

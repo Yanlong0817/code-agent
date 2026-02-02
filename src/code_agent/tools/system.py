@@ -5,8 +5,8 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 from rich.console import Console
-from rich.prompt import Prompt
 from rich.panel import Panel
+from rich.prompt import Prompt
 from rich.table import Table
 
 from code_agent.tools.base import BaseTool
@@ -17,8 +17,7 @@ class BashTool(BaseTool):
 
     name: ClassVar[str] = "Bash"
     description: ClassVar[str] = (
-        "执行带有可选超时的 bash 命令。"
-        "用于系统操作、git 命令、运行脚本等。"
+        "执行带有可选超时的 bash 命令。用于系统操作、git 命令、运行脚本等。"
     )
 
     class Input(BaseModel):
@@ -29,9 +28,7 @@ class BashTool(BaseTool):
             le=600000,
             description="超时时间（毫秒，最大 10 分钟）",
         )
-        working_dir: str | None = Field(
-            default=None, description="命令执行的工作目录"
-        )
+        working_dir: str | None = Field(default=None, description="命令执行的工作目录")
 
     async def execute(
         self,
@@ -63,9 +60,7 @@ class BashTool(BaseTool):
                 cwd=working_dir,
             )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=timeout_seconds
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
 
             output_parts = []
 
@@ -89,7 +84,7 @@ class BashTool(BaseTool):
 
             return output if output else "（无输出）"
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise TimeoutError(f"命令超时（{timeout_seconds} 秒）")
 
 
@@ -97,9 +92,7 @@ class AskUserQuestionTool(BaseTool):
     """交互式向用户提问。"""
 
     name: ClassVar[str] = "AskUserQuestion"
-    description: ClassVar[str] = (
-        "向用户提问以收集信息、澄清需求或获取实现选择的决定。"
-    )
+    description: ClassVar[str] = "向用户提问以收集信息、澄清需求或获取实现选择的决定。"
 
     class Option(BaseModel):
         label: str = Field(description="此选项的显示文本")
@@ -111,9 +104,7 @@ class AskUserQuestionTool(BaseTool):
         options: list["AskUserQuestionTool.Option"] = Field(
             min_length=2, max_length=4, description="可用选项"
         )
-        multi_select: bool = Field(
-            default=False, description="允许多选"
-        )
+        multi_select: bool = Field(default=False, description="允许多选")
 
     class Input(BaseModel):
         questions: list["AskUserQuestionTool.Question"] = Field(

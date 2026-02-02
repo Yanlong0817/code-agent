@@ -1,8 +1,6 @@
 """使用 Pydantic Settings 进行配置管理。"""
 
-import os
 from pathlib import Path
-from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -73,8 +71,7 @@ class Config(BaseSettings):
         """
         if not self.anthropic_api_key:
             raise ValueError(
-                "需要设置 ANTHROPIC_API_KEY 环境变量。"
-                "请在环境变量或 .env 文件中设置。"
+                "需要设置 ANTHROPIC_API_KEY 环境变量。请在环境变量或 .env 文件中设置。"
             )
 
     @classmethod

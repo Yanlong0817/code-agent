@@ -6,7 +6,6 @@ from typing import Any
 import anthropic
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.panel import Panel
 
 from code_agent.config import Config
 from code_agent.tools.base import ToolRegistry
@@ -109,12 +108,14 @@ class CodeAgent:
 
                 elif block.type == "tool_use":
                     tool_calls.append(block)
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input,
-                    })
+                    assistant_content.append(
+                        {
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        }
+                    )
 
             # 将助手消息添加到历史记录
             self.messages.append({"role": "assistant", "content": assistant_content})
@@ -164,7 +165,8 @@ class CodeAgent:
 
             if self.config.verbose:
                 self.console.print(f"[cyan]工具：{tool_name}[/cyan]")
-                self.console.print(f"[dim]输入：{json.dumps(tool_input, indent=2, ensure_ascii=False)}[/dim]")
+                input_str = json.dumps(tool_input, indent=2, ensure_ascii=False)
+                self.console.print(f"[dim]输入：{input_str}[/dim]")
 
             try:
                 # 执行工具
@@ -174,11 +176,13 @@ class CodeAgent:
                 if not isinstance(result, str):
                     result = json.dumps(result, indent=2, ensure_ascii=False)
 
-                results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_id,
-                    "content": result,
-                })
+                results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": result,
+                    }
+                )
 
                 if self.config.verbose:
                     self.console.print(f"[green]结果：{result[:200]}...[/green]")
@@ -187,12 +191,14 @@ class CodeAgent:
                 error_msg = f"执行 {tool_name} 时出错：{str(e)}"
                 self.console.print(f"[red]{error_msg}[/red]")
 
-                results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_id,
-                    "content": error_msg,
-                    "is_error": True,
-                })
+                results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": error_msg,
+                        "is_error": True,
+                    }
+                )
 
         return results
 

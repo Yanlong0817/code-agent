@@ -29,8 +29,7 @@ class TodoWriteTool(BaseTool):
 
     name: ClassVar[str] = "TodoWrite"
     description: ClassVar[str] = (
-        "创建和管理结构化的任务列表。用于跟踪进度、"
-        "组织复杂任务，并向用户展示当前工作内容。"
+        "创建和管理结构化的任务列表。用于跟踪进度、组织复杂任务，并向用户展示当前工作内容。"
     )
 
     class Input(BaseModel):
