@@ -71,9 +71,9 @@ class Config(BaseSettings):
         description="日志级别（DEBUG、INFO、WARNING、ERROR、CRITICAL）",
         alias="CODE_AGENT_LOG_LEVEL",
     )
-    log_file: Path | None = Field(
-        default=None,
-        description="日志文件路径（可选）",
+    log_file: Path = Field(
+        default=Path.home() / ".code_agent" / "logs" / "code_agent.log",
+        description="日志文件路径",
         alias="CODE_AGENT_LOG_FILE",
     )
 

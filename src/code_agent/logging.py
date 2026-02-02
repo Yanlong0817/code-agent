@@ -17,13 +17,15 @@ def setup_logging(
     level: LogLevel = "INFO",
     log_file: Path | None = None,
     format_string: str = DEFAULT_FORMAT,
+    console_output: bool = False,
 ) -> logging.Logger:
     """配置并返回 code_agent 的根日志记录器。
 
     Args:
         level: 日志级别（DEBUG、INFO、WARNING、ERROR、CRITICAL）
-        log_file: 可选的日志文件路径
+        log_file: 日志文件路径
         format_string: 日志格式字符串
+        console_output: 是否输出到控制台（默认 False，只写文件）
 
     Returns:
         配置好的日志记录器
@@ -38,12 +40,13 @@ def setup_logging(
     # 创建格式化器
     formatter = logging.Formatter(format_string)
 
-    # 添加控制台处理器
-    console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # 如果启用控制台输出，添加控制台处理器
+    if console_output:
+        console_handler = logging.StreamHandler(sys.stderr)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
-    # 如果指定了日志文件，添加文件处理器
+    # 添加文件处理器
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
