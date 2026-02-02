@@ -89,7 +89,8 @@ class CodeAgent:
             最终的助手响应
         """
         logger.info("开始处理用户请求")
-        logger.debug("用户输入: %s", user_input[:100] + "..." if len(user_input) > 100 else user_input)
+        truncated = user_input[:100] + "..." if len(user_input) > 100 else user_input
+        logger.debug("用户输入: %s", truncated)
         self.messages.append({"role": "user", "content": user_input})
 
         iteration = 0
