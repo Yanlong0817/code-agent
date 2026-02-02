@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from code_agent.agent import CodeAgent
+from code_agent.commands import CommandHandler
 from code_agent.config import Config
 from code_agent.logging import setup_logging
 
@@ -19,7 +20,10 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
         agent: CodeAgent 实例
         console: Rich Console 实例
     """
-    console.print("[dim]输入你的请求，或输入 'quit' 退出。[/dim]\n")
+    # 初始化命令处理器
+    command_handler = CommandHandler(agent)
+
+    console.print("[dim]输入你的请求，输入 / 查看命令，或输入 'quit' 退出。[/dim]\n")
 
     while True:
         try:
@@ -31,6 +35,11 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
                 break
 
             if not user_input.strip():
+                continue
+
+            # 检查是否是命令
+            if command_handler.is_command(user_input):
+                await command_handler.execute(user_input)
                 continue
 
             await agent.run(user_input)
