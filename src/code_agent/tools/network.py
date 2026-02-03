@@ -6,7 +6,11 @@ import html2text
 import httpx
 from pydantic import BaseModel, Field
 
+from code_agent.logging import get_logger
 from code_agent.tools.base import BaseTool
+
+# 获取模块日志记录器
+logger = get_logger("tools.network")
 
 
 class WebFetchTool(BaseTool):
@@ -48,9 +52,11 @@ class WebFetchTool(BaseTool):
         Returns:
             Markdown 格式的页面内容
         """
-        # 确保使用 HTTPS
+        # 确保使用 HTTPS（记录转换）
+        original_url = url
         if url.startswith("http://"):
             url = "https://" + url[7:]
+            logger.info("已将 HTTP URL 转换为 HTTPS: %s -> %s", original_url, url)
 
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; CodeAgent/1.0)",

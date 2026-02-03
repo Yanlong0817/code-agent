@@ -180,8 +180,8 @@ class SessionManager:
                     data = json.load(f)
                 metadata = SessionMetadata.model_validate(data.get("metadata", {}))
                 sessions.append(metadata)
-            except Exception:
-                # 跳过无效的会话文件
+            except (json.JSONDecodeError, KeyError, ValueError, OSError):
+                # 跳过无效或损坏的会话文件
                 continue
 
         # 按更新时间倒序排序
@@ -220,7 +220,8 @@ class SessionManager:
                     if isinstance(content, str) and keyword_lower in content.lower():
                         results.append(SessionMetadata.model_validate(metadata))
                         break
-            except Exception:
+            except (json.JSONDecodeError, KeyError, ValueError, OSError):
+                # 跳过无效或损坏的会话文件
                 continue
 
         # 按更新时间倒序排序

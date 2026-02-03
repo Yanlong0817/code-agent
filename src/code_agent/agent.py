@@ -79,6 +79,9 @@ class CodeAgent:
         # 命令处理器（延迟初始化，避免循环导入）
         self._command_handler: CommandHandler | None = None
 
+        # 当前会话（用于会话管理命令）
+        self._current_session: Any = None
+
     @property
     def command_handler(self) -> CommandHandler:
         """获取命令处理器（延迟初始化）。
@@ -249,7 +252,11 @@ class CodeAgent:
 
                 # 如果需要，将结果转换为字符串
                 if not isinstance(result, str):
-                    result = json.dumps(result, indent=2, ensure_ascii=False)
+                    try:
+                        result = json.dumps(result, indent=2, ensure_ascii=False)
+                    except (TypeError, ValueError):
+                        # 处理不可序列化的对象
+                        result = str(result)
 
                 duration = time.time() - start_time
                 logger.debug("工具 %s 执行成功", tool_name)
@@ -297,3 +304,4 @@ class CodeAgent:
         """重置对话历史和状态。"""
         self.messages = []
         self.status_bar.reset()
+        self._current_session = None

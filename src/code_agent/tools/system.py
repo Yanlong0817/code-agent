@@ -128,7 +128,7 @@ class AskUserQuestionTool(BaseTool):
     def __init__(self) -> None:
         self.console = Console()
 
-    async def execute(self, questions: list[dict[str, Any]]) -> dict[str, str]:
+    async def execute(self, questions: list[dict[str, Any]]) -> dict[str, Any]:
         """提问并收集答案。
 
         Args:

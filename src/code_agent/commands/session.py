@@ -1,6 +1,6 @@
 """会话管理命令。"""
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from rich import box
 from rich.prompt import Prompt
@@ -58,7 +58,7 @@ class SaveCommand(BaseCommand):
             f"  文件: [dim]{path}[/dim]"
         )
 
-    def _generate_title(self, messages: list) -> str:
+    def _generate_title(self, messages: list[dict[str, Any]]) -> str:
         """从第一条用户消息生成标题。
 
         Args:
