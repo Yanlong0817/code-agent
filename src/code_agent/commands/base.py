@@ -3,6 +3,10 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar
 
+from rich import box
+from rich.panel import Panel
+from rich.table import Table
+
 if TYPE_CHECKING:
     from code_agent.agent import CodeAgent
 
@@ -78,13 +82,29 @@ class CommandRegistry:
         """
         return [name for name in self._commands if name.startswith(prefix)]
 
-    def get_help(self) -> str:
+    def get_help(self) -> Panel:
         """获取所有命令的帮助信息。
 
         Returns:
-            格式化的帮助文本
+            格式化的帮助 Panel
         """
-        lines = ["可用命令："]
+        # 创建命令表格
+        table = Table.grid(padding=(0, 2))
+        table.add_column(style="cyan", justify="left")
+        table.add_column(style="dim")
+
         for name, cmd_class in sorted(self._commands.items()):
-            lines.append(f"  /{name} - {cmd_class.description}")
-        return "\n".join(lines)
+            table.add_row(f"/{name}", cmd_class.description)
+
+        # 添加退出提示
+        table.add_row("")
+        table.add_row("[dim]quit[/dim]", "[dim]Exit the program[/dim]")
+
+        return Panel(
+            table,
+            title="Commands",
+            title_align="left",
+            border_style="bright_black",
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )

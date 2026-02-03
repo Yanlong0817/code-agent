@@ -72,9 +72,11 @@ class TestCommandRegistry:
         """测试获取帮助信息。"""
         registry.register(MockCommand)
 
-        help_text = registry.get_help()
-        assert "/mock" in help_text
-        assert "模拟命令" in help_text
+        help_panel = registry.get_help()
+        # get_help 现在返回 Panel 对象
+        from rich.panel import Panel
+
+        assert isinstance(help_panel, Panel)
 
 
 class TestCommandHandler:

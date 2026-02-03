@@ -4,13 +4,13 @@ import asyncio
 import sys
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Prompt
 
 from code_agent.agent import CodeAgent
 from code_agent.commands import CommandHandler
 from code_agent.config import Config
 from code_agent.logging import setup_logging
+from code_agent.ui import get_prompt_markup, render_banner
 
 
 async def run_interactive(agent: CodeAgent, console: Console) -> None:
@@ -23,12 +23,13 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
     # 初始化命令处理器
     command_handler = CommandHandler(agent)
 
-    console.print("[dim]输入你的请求，输入 / 查看命令，或输入 'quit' 退出。[/dim]\n")
+    # 获取提示符
+    prompt_text = get_prompt_markup()
 
     while True:
         try:
             # 在线程池中运行同步的 Prompt.ask，避免阻塞事件循环
-            user_input = await asyncio.to_thread(Prompt.ask, "[bold green]>[/bold green]")
+            user_input = await asyncio.to_thread(Prompt.ask, prompt_text)
 
             if user_input.lower() in ("quit", "exit", "q"):
                 console.print("[dim]再见！[/dim]")
@@ -54,20 +55,17 @@ def main() -> None:
     """CLI 主入口函数。"""
     console = Console()
 
-    # 显示横幅
-    console.print(
-        Panel.fit(
-            "[bold cyan]Code Agent[/bold cyan]\n[dim]基于 Claude 的智能代码助手[/dim]",
-            border_style="cyan",
-        )
-    )
-
     try:
         config = Config.from_env()
         config.validate_required()
     except ValueError as e:
         console.print(f"[red]配置错误：{e}[/red]")
         sys.exit(1)
+
+    # 显示欢迎横幅
+    banner = render_banner(config.model)
+    console.print(banner)
+    console.print()  # 空行
 
     # 初始化日志系统
     setup_logging(level=config.log_level, log_file=config.log_file)

@@ -1,6 +1,7 @@
 """Code Agent - 集成 Claude API 的主 Agent 循环。"""
 
 import json
+import time
 from typing import Any
 
 from anthropic import AsyncAnthropic
@@ -15,6 +16,7 @@ from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, ReadTool, Wr
 from code_agent.tools.network import WebFetchTool, WebSearchTool
 from code_agent.tools.system import AskUserQuestionTool, BashTool
 from code_agent.tools.task import TodoWriteTool
+from code_agent.ui import StatusBar, ToolDisplay
 
 # 获取模块日志记录器
 logger = get_logger("agent")
@@ -53,6 +55,14 @@ class CodeAgent:
         )
         self.console = Console()
         self.messages: list[dict[str, Any]] = []
+
+        # 初始化 UI 组件
+        self.tool_display = ToolDisplay(self.console)
+        self.status_bar = StatusBar(
+            model=self.config.model,
+            max_tokens=self.config.max_tokens,
+            max_iterations=self.config.max_iterations,
+        )
 
         # 初始化工具
         self.registry = ToolRegistry()
@@ -99,6 +109,7 @@ class CodeAgent:
 
         while iteration < self.config.max_iterations:
             iteration += 1
+            self.status_bar.update_iteration(iteration)
             logger.debug("迭代 %d/%d", iteration, self.config.max_iterations)
 
             if self.config.verbose:
@@ -108,6 +119,13 @@ class CodeAgent:
             logger.debug("调用 Claude API（流式）")
             response, text_content = await self._call_api_stream()
             logger.debug("API 响应停止原因: %s", response.stop_reason)
+
+            # 更新 token 使用量
+            if hasattr(response, "usage"):
+                self.status_bar.update_tokens(
+                    response.usage.input_tokens,
+                    response.usage.output_tokens,
+                )
 
             if text_content:
                 final_response = text_content
@@ -136,6 +154,8 @@ class CodeAgent:
             # 检查停止原因
             if response.stop_reason == "end_turn":
                 logger.info("Agent 完成处理，共 %d 次迭代", iteration)
+                # 显示状态栏
+                self.console.print(self.status_bar.render_simple())
                 break
 
             # 执行工具调用
@@ -188,22 +208,32 @@ class CodeAgent:
             tool_input = tool_call.input
             tool_id = tool_call.id
 
-            if self.config.verbose:
-                self.console.print(f"[cyan]工具：{tool_name}[/cyan]")
-                input_str = json.dumps(tool_input, indent=2, ensure_ascii=False)
-                self.console.print(f"[dim]输入：{input_str}[/dim]")
-
             logger.debug("执行工具: %s", tool_name)
 
+            # 显示工具调用 Panel
+            panel = self.tool_display.render_tool_call(tool_name, tool_input)
+            self.console.print(panel)
+
+            start_time = time.time()
+
             try:
-                # 执行工具
-                result = await self.registry.execute(tool_name, **tool_input)
+                # 使用 Spinner 执行工具
+                async with self.tool_display.show_spinner(tool_name):
+                    result = await self.registry.execute(tool_name, **tool_input)
 
                 # 如果需要，将结果转换为字符串
                 if not isinstance(result, str):
                     result = json.dumps(result, indent=2, ensure_ascii=False)
 
+                duration = time.time() - start_time
                 logger.debug("工具 %s 执行成功", tool_name)
+
+                # 显示成功结果
+                result_text = self.tool_display.render_tool_result(
+                    success=True,
+                    duration=duration,
+                )
+                self.console.print(result_text)
 
                 results.append(
                     {
@@ -213,13 +243,18 @@ class CodeAgent:
                     }
                 )
 
-                if self.config.verbose:
-                    self.console.print(f"[green]结果：{result[:200]}...[/green]")
-
             except Exception as e:
+                duration = time.time() - start_time
                 error_msg = f"执行 {tool_name} 时出错：{str(e)}"
                 logger.error("工具执行失败: %s - %s", tool_name, str(e))
-                self.console.print(f"[red]{error_msg}[/red]")
+
+                # 显示错误结果
+                result_text = self.tool_display.render_tool_result(
+                    success=False,
+                    duration=duration,
+                    error_msg=str(e),
+                )
+                self.console.print(result_text)
 
                 results.append(
                     {
@@ -233,5 +268,6 @@ class CodeAgent:
         return results
 
     def reset(self) -> None:
-        """重置对话历史。"""
+        """重置对话历史和状态。"""
         self.messages = []
+        self.status_bar.reset()
