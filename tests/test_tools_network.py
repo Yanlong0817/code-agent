@@ -67,9 +67,7 @@ class TestWebFetchTool:
             mock_instance.__aexit__.return_value = None
             mock_client.return_value = mock_instance
 
-            result = await tool.execute(
-                "https://example.com", prompt="提取主要内容"
-            )
+            result = await tool.execute("https://example.com", prompt="提取主要内容")
 
             assert "提取提示：提取主要内容" in result
 

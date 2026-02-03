@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
+from code_agent.safety import check_command_safety, confirm_dangerous_action
 from code_agent.tools.base import BaseTool
 
 
@@ -18,6 +19,7 @@ class BashTool(BaseTool):
     name: ClassVar[str] = "Bash"
     description: ClassVar[str] = (
         "执行带有可选超时的 bash 命令。用于系统操作、git 命令、运行脚本等。"
+        "危险命令会在执行前请求用户确认。"
     )
 
     class Input(BaseModel):
@@ -49,7 +51,19 @@ class BashTool(BaseTool):
         Raises:
             TimeoutError: 如果命令超时
             RuntimeError: 如果命令执行失败
+            PermissionError: 如果用户拒绝执行危险命令
         """
+        # 安全检查
+        safety_check = check_command_safety(command)
+        if safety_check.is_dangerous:
+            confirmed = confirm_dangerous_action(
+                safety_check,
+                "执行命令",
+                command,
+            )
+            if not confirmed:
+                return "[已取消] 用户拒绝执行此危险命令"
+
         timeout_seconds = timeout / 1000
 
         try:

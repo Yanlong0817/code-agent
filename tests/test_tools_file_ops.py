@@ -1,6 +1,5 @@
 """文件操作工具测试。"""
 
-import os
 from pathlib import Path
 
 import pytest
@@ -85,9 +84,7 @@ class TestWriteTool:
         assert file_path.read_text() == content
         assert "成功写入" in result
 
-    async def test_write_creates_directories(
-        self, tool: WriteTool, tmp_path: Path
-    ) -> None:
+    async def test_write_creates_directories(self, tool: WriteTool, tmp_path: Path) -> None:
         """测试写入时创建父目录。"""
         file_path = tmp_path / "nested" / "dir" / "file.txt"
 
@@ -121,9 +118,7 @@ class TestEditTool:
 
     async def test_replace_single(self, tool: EditTool, sample_file: Path) -> None:
         """测试单次替换。"""
-        result = await tool.execute(
-            str(sample_file), old_string="hello", new_string="greet"
-        )
+        result = await tool.execute(str(sample_file), old_string="hello", new_string="greet")
 
         content = sample_file.read_text()
         assert "def greet():" in content
@@ -134,9 +129,7 @@ class TestEditTool:
         file_path = tmp_path / "test.txt"
         file_path.write_text("foo bar foo baz foo")
 
-        await tool.execute(
-            str(file_path), old_string="foo", new_string="qux", replace_all=True
-        )
+        await tool.execute(str(file_path), old_string="foo", new_string="qux", replace_all=True)
 
         assert file_path.read_text() == "qux bar qux baz qux"
 
@@ -151,18 +144,12 @@ class TestEditTool:
     async def test_replace_not_found(self, tool: EditTool, sample_file: Path) -> None:
         """测试字符串未找到。"""
         with pytest.raises(ValueError, match="未找到"):
-            await tool.execute(
-                str(sample_file), old_string="nonexistent", new_string="x"
-            )
+            await tool.execute(str(sample_file), old_string="nonexistent", new_string="x")
 
-    async def test_replace_nonexistent_file(
-        self, tool: EditTool, tmp_path: Path
-    ) -> None:
+    async def test_replace_nonexistent_file(self, tool: EditTool, tmp_path: Path) -> None:
         """测试编辑不存在的文件。"""
         with pytest.raises(FileNotFoundError):
-            await tool.execute(
-                str(tmp_path / "nope.txt"), old_string="a", new_string="b"
-            )
+            await tool.execute(str(tmp_path / "nope.txt"), old_string="a", new_string="b")
 
 
 class TestGlobTool:
@@ -214,6 +201,7 @@ class TestGlobTool:
 def has_ripgrep() -> bool:
     """检查是否安装了 ripgrep。"""
     import shutil
+
     return shutil.which("rg") is not None
 
 
@@ -232,9 +220,7 @@ class TestGrepTool:
         (tmp_path / "data.txt").write_text("hello world\nfoo bar\n")
         return tmp_path
 
-    async def test_grep_files_with_matches(
-        self, tool: GrepTool, sample_dir: Path
-    ) -> None:
+    async def test_grep_files_with_matches(self, tool: GrepTool, sample_dir: Path) -> None:
         """测试搜索并返回文件列表。"""
         result = await tool.execute(
             pattern="hello", path=str(sample_dir), output_mode="files_with_matches"
@@ -245,15 +231,11 @@ class TestGrepTool:
 
     async def test_grep_content(self, tool: GrepTool, sample_dir: Path) -> None:
         """测试搜索并返回内容。"""
-        result = await tool.execute(
-            pattern="def", path=str(sample_dir), output_mode="content"
-        )
+        result = await tool.execute(pattern="def", path=str(sample_dir), output_mode="content")
 
         assert "def hello" in result
 
-    async def test_grep_case_insensitive(
-        self, tool: GrepTool, sample_dir: Path
-    ) -> None:
+    async def test_grep_case_insensitive(self, tool: GrepTool, sample_dir: Path) -> None:
         """测试不区分大小写搜索。"""
         result = await tool.execute(
             pattern="HELLO",
@@ -272,9 +254,7 @@ class TestGrepTool:
 
         assert "未找到" in result
 
-    async def test_grep_with_file_type(
-        self, tool: GrepTool, sample_dir: Path
-    ) -> None:
+    async def test_grep_with_file_type(self, tool: GrepTool, sample_dir: Path) -> None:
         """测试按文件类型过滤。"""
         result = await tool.execute(
             pattern="hello",

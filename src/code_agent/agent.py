@@ -1,8 +1,10 @@
 """Code Agent - 集成 Claude API 的主 Agent 循环。"""
 
+from __future__ import annotations
+
 import json
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from anthropic import AsyncAnthropic
 from rich.console import Console
@@ -13,10 +15,14 @@ from code_agent.config import Config
 from code_agent.logging import get_logger
 from code_agent.tools.base import ToolRegistry
 from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, ReadTool, WriteTool
+from code_agent.tools.git import GitTool
 from code_agent.tools.network import WebFetchTool, WebSearchTool
 from code_agent.tools.system import AskUserQuestionTool, BashTool
 from code_agent.tools.task import TodoWriteTool
 from code_agent.ui import StatusBar, ToolDisplay
+
+if TYPE_CHECKING:
+    from code_agent.commands import CommandHandler
 
 # 获取模块日志记录器
 logger = get_logger("agent")
@@ -62,12 +68,29 @@ class CodeAgent:
             model=self.config.model,
             max_tokens=self.config.max_tokens,
             max_iterations=self.config.max_iterations,
+            console=self.console,
         )
 
         # 初始化工具
         self.registry = ToolRegistry()
         self._register_tools()
         logger.debug("已注册 %d 个工具", len(self.registry.get_all()))
+
+        # 命令处理器（延迟初始化，避免循环导入）
+        self._command_handler: CommandHandler | None = None
+
+    @property
+    def command_handler(self) -> CommandHandler:
+        """获取命令处理器（延迟初始化）。
+
+        Returns:
+            CommandHandler 实例
+        """
+        if self._command_handler is None:
+            from code_agent.commands import CommandHandler
+
+            self._command_handler = CommandHandler(self)
+        return self._command_handler
 
     def _register_tools(self) -> None:
         """注册所有可用工具。"""
@@ -81,6 +104,9 @@ class CodeAgent:
         # 系统工具
         self.registry.register(BashTool())
         self.registry.register(AskUserQuestionTool())
+
+        # Git 工具
+        self.registry.register(GitTool())
 
         # 网络工具
         self.registry.register(WebFetchTool())

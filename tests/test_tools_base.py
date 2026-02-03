@@ -1,6 +1,6 @@
 """工具基类测试。"""
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import pytest
 from pydantic import BaseModel, Field

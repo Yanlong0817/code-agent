@@ -5,11 +5,14 @@ __version__ = "0.1.0"
 from code_agent.agent import CodeAgent
 from code_agent.config import Config
 from code_agent.logging import get_logger, setup_logging
+from code_agent.safety import SafetyCheck, SafetyChecker, get_safety_checker
+from code_agent.session import Session, SessionManager, SessionMetadata
 from code_agent.tools import (
     AskUserQuestionTool,
     BaseTool,
     BashTool,
     EditTool,
+    GitTool,
     GlobTool,
     GrepTool,
     ReadTool,
@@ -24,6 +27,14 @@ __all__ = [
     # 核心
     "CodeAgent",
     "Config",
+    # 会话管理
+    "Session",
+    "SessionManager",
+    "SessionMetadata",
+    # 安全
+    "SafetyCheck",
+    "SafetyChecker",
+    "get_safety_checker",
     # 日志
     "setup_logging",
     "get_logger",
@@ -36,6 +47,8 @@ __all__ = [
     "EditTool",
     "GlobTool",
     "GrepTool",
+    # Git 工具
+    "GitTool",
     # 系统工具
     "BashTool",
     "AskUserQuestionTool",

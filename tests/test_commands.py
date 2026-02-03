@@ -164,9 +164,7 @@ class TestModelCommand:
         # 应该显示错误
         mock_agent.console.print.assert_called()
 
-    async def test_execute_same_model(
-        self, command: ModelCommand, mock_agent: MagicMock
-    ) -> None:
+    async def test_execute_same_model(self, command: ModelCommand, mock_agent: MagicMock) -> None:
         """测试切换到相同模型。"""
         mock_agent.config.model = "claude-sonnet-4-20250514"
 

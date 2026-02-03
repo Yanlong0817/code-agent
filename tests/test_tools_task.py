@@ -18,14 +18,12 @@ class TestTodoItem:
 
     def test_create_with_status(self) -> None:
         """测试创建指定状态的 TodoItem。"""
-        item = TodoItem(
-            content="Test task", status="in_progress", activeForm="正在测试"
-        )
+        item = TodoItem(content="Test task", status="in_progress", activeForm="正在测试")
 
         assert item.status == "in_progress"
 
-    def test_alias_activeForm(self) -> None:
-        """测试 activeForm 别名。"""
+    def test_alias_active_form(self) -> None:
+        """测试 active_form 别名。"""
         item = TodoItem(content="Test", active_form="Testing")
         assert item.active_form == "Testing"
 

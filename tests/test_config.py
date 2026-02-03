@@ -1,6 +1,5 @@
 """配置模块测试。"""
 
-import os
 from pathlib import Path
 
 import pytest
@@ -57,9 +56,7 @@ class TestConfig:
         with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
             config.validate_required()
 
-    def test_validate_required_with_api_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_validate_required_with_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试有 API Key 时的验证。"""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 

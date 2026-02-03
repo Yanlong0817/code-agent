@@ -3,7 +3,13 @@
 from typing import TYPE_CHECKING
 
 from code_agent.commands.base import BaseCommand, CommandRegistry
+from code_agent.commands.clear import ClearCommand
+from code_agent.commands.export import ExportCommand
+from code_agent.commands.help import HelpCommand
+from code_agent.commands.history import HistoryCommand
 from code_agent.commands.model import ModelCommand
+from code_agent.commands.session import LoadCommand, SaveCommand, SessionsCommand
+from code_agent.commands.tools import ToolsCommand
 
 if TYPE_CHECKING:
     from code_agent.agent import CodeAgent
@@ -24,7 +30,20 @@ class CommandHandler:
 
     def _register_commands(self) -> None:
         """注册所有可用命令。"""
+        # 核心命令
+        self.registry.register(HelpCommand)
+        self.registry.register(ClearCommand)
+
+        # 功能命令
         self.registry.register(ModelCommand)
+        self.registry.register(ToolsCommand)
+        self.registry.register(HistoryCommand)
+        self.registry.register(ExportCommand)
+
+        # 会话管理命令
+        self.registry.register(SaveCommand)
+        self.registry.register(LoadCommand)
+        self.registry.register(SessionsCommand)
 
     def is_command(self, text: str) -> bool:
         """检查输入是否是命令。

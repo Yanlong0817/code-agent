@@ -1,6 +1,5 @@
 """系统工具测试。"""
 
-import asyncio
 from pathlib import Path
 
 import pytest
