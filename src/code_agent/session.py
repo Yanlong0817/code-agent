@@ -86,6 +86,27 @@ class SessionManager:
 
         return Session(metadata=metadata, messages=[])
 
+    def _sanitize_for_json(self, obj: Any) -> Any:
+        """递归清理数据中的 surrogate 字符。
+
+        当子进程输出包含无效 UTF-8 字节序列时，decode() 可能创建 Unicode 代理字符
+        （U+D800-U+DFFF），这些字符在 JSON 序列化时会导致编码失败。
+
+        Args:
+            obj: 要清理的数据对象
+
+        Returns:
+            清理后的数据对象
+        """
+        if isinstance(obj, str):
+            # 编码为 UTF-8 时替换无效字符，然后解码回字符串
+            return obj.encode("utf-8", errors="replace").decode("utf-8")
+        elif isinstance(obj, dict):
+            return {k: self._sanitize_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._sanitize_for_json(item) for item in obj]
+        return obj
+
     def save(self, session: Session) -> Path:
         """保存会话。
 
@@ -99,10 +120,13 @@ class SessionManager:
         session.metadata.updated_at = datetime.now().isoformat()
         session.metadata.message_count = len(session.messages)
 
+        # 清理可能包含 surrogate 字符的数据
+        data = self._sanitize_for_json(session.model_dump())
+
         # 写入文件
         path = self._get_session_path(session.metadata.id)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(session.model_dump(), f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
         return path
 

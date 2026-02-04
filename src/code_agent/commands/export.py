@@ -3,9 +3,30 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from code_agent.commands.base import BaseCommand
+
+
+def _sanitize_for_json(obj: Any) -> Any:
+    """递归清理数据中的 surrogate 字符。
+
+    当子进程输出包含无效 UTF-8 字节序列时，decode() 可能创建 Unicode 代理字符
+    （U+D800-U+DFFF），这些字符在 JSON 序列化时会导致编码失败。
+
+    Args:
+        obj: 要清理的数据对象
+
+    Returns:
+        清理后的数据对象
+    """
+    if isinstance(obj, str):
+        return obj.encode("utf-8", errors="replace").decode("utf-8")
+    elif isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_for_json(item) for item in obj]
+    return obj
 
 
 class ExportCommand(BaseCommand):
@@ -48,10 +69,11 @@ class ExportCommand(BaseCommand):
             "stats": self._collect_stats(messages),
         }
 
-        # 写入文件
+        # 清理可能包含 surrogate 字符的数据并写入文件
         try:
+            sanitized_data = _sanitize_for_json(export_data)
             with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(export_data, f, ensure_ascii=False, indent=2)
+                json.dump(sanitized_data, f, ensure_ascii=False, indent=2)
 
             console.print(
                 f"[green]已导出 {len(messages)} 条消息到：[/green][cyan]{output_path}[/cyan]"

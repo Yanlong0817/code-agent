@@ -295,12 +295,14 @@ class GrepTool(BaseTool):
                 # 未找到匹配
                 return f"未找到匹配模式的内容：{pattern}"
             elif proc.returncode != 0:
-                error_msg = stderr.decode().strip()
+                # 使用 errors="replace" 处理无效 UTF-8 字节序列
+                error_msg = stderr.decode(errors="replace").strip()
                 if "not found" in error_msg.lower() or "command not found" in error_msg.lower():
                     raise RuntimeError("ripgrep (rg) 未安装。请先安装它。")
                 raise RuntimeError(f"ripgrep 错误：{error_msg}")
 
-            return stdout.decode().strip()
+            # 使用 errors="replace" 处理无效 UTF-8 字节序列，避免 surrogate 字符
+            return stdout.decode(errors="replace").strip()
 
         except FileNotFoundError:
             raise RuntimeError("ripgrep (rg) 未安装。请先安装它。")
