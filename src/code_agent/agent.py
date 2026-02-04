@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from anthropic import AsyncAnthropic
 from rich.console import Console
@@ -219,8 +219,8 @@ class CodeAgent:
             model=self.config.model,
             max_tokens=self.config.max_tokens,
             system=self.SYSTEM_PROMPT,
-            tools=self.registry.get_schemas(),
-            messages=self.messages,
+            tools=cast(Any, self.registry.get_schemas()),
+            messages=cast(Any, self.messages),
         ) as stream:
             # 使用 Rich Live 实时渲染 Markdown
             with Live(Markdown(""), console=self.console, refresh_per_second=10) as live:

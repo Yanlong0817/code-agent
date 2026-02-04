@@ -103,6 +103,9 @@ class CommandHandler:
             if len(completions) == 1:
                 # 唯一匹配，执行该命令
                 command_class = self.registry.get(completions[0])
+                if command_class is None:
+                    self.agent.console.print(f"[red]未知命令：/{command_name}[/red]")
+                    return True
             elif len(completions) > 1:
                 # 多个匹配，显示建议
                 self.agent.console.print(

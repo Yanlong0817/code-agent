@@ -39,7 +39,7 @@ class TodoWriteTool(BaseTool):
         self.console = Console()
         self.todos: list[TodoItem] = []
 
-    async def execute(self, todos: list[dict[str, Any]]) -> str:
+    async def execute(self, todos: list[dict[str, Any]]) -> str:  # type: ignore[override]
         """更新并显示待办事项列表。
 
         Args:

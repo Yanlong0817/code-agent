@@ -40,7 +40,7 @@ class GitTool(BaseTool):
         args: str = Field(default="", description="操作参数（如文件路径、分支名等）")
         working_dir: str | None = Field(default=None, description="Git 仓库目录（默认当前目录）")
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         operation: str,
         args: str = "",

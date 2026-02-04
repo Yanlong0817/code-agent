@@ -22,7 +22,7 @@ class ReadTool(BaseTool):
         offset: int = Field(default=0, ge=0, description="开始读取的行号（从 0 开始）")
         limit: int = Field(default=2000, gt=0, le=10000, description="最大读取行数")
 
-    async def execute(self, file_path: str, offset: int = 0, limit: int = 2000) -> str:
+    async def execute(self, file_path: str, offset: int = 0, limit: int = 2000) -> str:  # type: ignore[override]
         """读取带行号的文件内容。
 
         Args:
@@ -74,7 +74,7 @@ class WriteTool(BaseTool):
         file_path: str = Field(description="要写入的文件的绝对路径")
         content: str = Field(description="要写入文件的内容")
 
-    async def execute(self, file_path: str, content: str) -> str:
+    async def execute(self, file_path: str, content: str) -> str:  # type: ignore[override]
         """将内容写入文件。
 
         Args:
@@ -109,7 +109,7 @@ class EditTool(BaseTool):
         new_string: str = Field(description="替换后的文本")
         replace_all: bool = Field(default=False, description="如果为 True，替换所有匹配项")
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self, file_path: str, old_string: str, new_string: str, replace_all: bool = False
     ) -> str:
         """替换文件中的文本。
@@ -172,7 +172,7 @@ class GlobTool(BaseTool):
         pattern: str = Field(description="要匹配的 glob 模式（如 '**/*.py'、'src/**/*.ts'）")
         path: str = Field(default=".", description="要搜索的目录")
 
-    async def execute(self, pattern: str, path: str = ".") -> str:
+    async def execute(self, pattern: str, path: str = ".") -> str:  # type: ignore[override]
         """查找匹配 glob 模式的文件。
 
         Args:
@@ -231,7 +231,7 @@ class GrepTool(BaseTool):
         case_insensitive: bool = Field(default=False, description="不区分大小写搜索")
         max_results: int = Field(default=100, gt=0, le=1000, description="最大返回结果数")
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         pattern: str,
         path: str = ".",

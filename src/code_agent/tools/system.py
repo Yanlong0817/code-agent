@@ -32,7 +32,7 @@ class BashTool(BaseTool):
         )
         working_dir: str | None = Field(default=None, description="命令执行的工作目录")
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         command: str,
         timeout: int = 120000,
@@ -128,7 +128,7 @@ class AskUserQuestionTool(BaseTool):
     def __init__(self) -> None:
         self.console = Console()
 
-    async def execute(self, questions: list[dict[str, Any]]) -> dict[str, Any]:
+    async def execute(self, questions: list[dict[str, Any]]) -> dict[str, Any]:  # type: ignore[override]
         """提问并收集答案。
 
         Args:

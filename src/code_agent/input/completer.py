@@ -1,5 +1,7 @@
 """命令自动补全模块。"""
 
+from collections.abc import Iterable
+
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 
@@ -22,7 +24,7 @@ class CommandCompleter(Completer):
 
     def get_completions(
         self, document: Document, complete_event: CompleteEvent
-    ) -> list[Completion]:
+    ) -> Iterable[Completion]:
         """获取补全建议。
 
         Args:

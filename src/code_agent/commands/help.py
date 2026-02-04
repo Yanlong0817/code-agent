@@ -38,7 +38,7 @@ class HelpCommand(BaseCommand):
         console = self.agent.console
 
         # 显示命令帮助
-        handler: CommandHandler = self.agent.command_handler  # type: ignore
+        handler: CommandHandler = self.agent.command_handler
         console.print(handler.registry.get_help())
         console.print()
 
@@ -76,7 +76,7 @@ class HelpCommand(BaseCommand):
         console = self.agent.console
 
         # 先检查是否是命令
-        handler: CommandHandler = self.agent.command_handler  # type: ignore
+        handler: CommandHandler = self.agent.command_handler
         cmd_name = name.lstrip("/")
         cmd_class = handler.registry.get(cmd_name)
 

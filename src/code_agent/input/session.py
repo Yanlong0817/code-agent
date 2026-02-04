@@ -1,6 +1,9 @@
 """输入会话模块。"""
 
+from typing import cast
+
 from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import AnyFormattedText
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from code_agent.commands.base import CommandRegistry
@@ -43,7 +46,7 @@ class InputSession:
         Returns:
             用户输入的文本
         """
-        prompt_fragments = get_prompt_fragments()
+        prompt_fragments = cast(AnyFormattedText, get_prompt_fragments())
 
         with patch_stdout():
             return await self._session.prompt_async(prompt_fragments)

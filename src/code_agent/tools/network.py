@@ -36,7 +36,7 @@ class WebFetchTool(BaseTool):
         self.html_converter.ignore_emphasis = False
         self.html_converter.body_width = 0  # 不换行
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         url: str,
         prompt: str = "",
@@ -119,10 +119,10 @@ class WebSearchTool(BaseTool):
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         query: str,
-        search_depth: str = "basic",
+        search_depth: Literal["basic", "advanced", "fast", "ultra-fast"] = "basic",
         include_domains: list[str] | None = None,
         exclude_domains: list[str] | None = None,
         max_results: int = 5,
