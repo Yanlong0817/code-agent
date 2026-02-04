@@ -11,10 +11,12 @@ def get_prompt_style() -> Style:
     Returns:
         prompt_toolkit Style 实例
     """
-    return Style.from_dict({
-        "prompt": Theme.PRIMARY,
-        "prompt.arrow": f"{Theme.PRIMARY} bold",
-    })
+    return Style.from_dict(
+        {
+            "prompt": Theme.PRIMARY,
+            "prompt.arrow": f"{Theme.PRIMARY} bold",
+        }
+    )
 
 
 def get_prompt_fragments() -> list[tuple[str, str]]:
