@@ -6,14 +6,14 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
-from rich.prompt import Prompt
 
 from code_agent import __version__
 from code_agent.agent import CodeAgent
 from code_agent.config import Config
+from code_agent.input import InputSession
 from code_agent.logging import setup_logging
 from code_agent.session import SessionManager
-from code_agent.ui import get_prompt_markup, render_banner
+from code_agent.ui import render_banner
 
 
 def parse_args() -> argparse.Namespace:
@@ -128,13 +128,13 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
     # 使用 agent 的命令处理器
     command_handler = agent.command_handler
 
-    # 获取提示符
-    prompt_text = get_prompt_markup()
+    # 创建输入会话
+    input_session = InputSession(command_handler.registry)
 
     while True:
         try:
-            # 在线程池中运行同步的 Prompt.ask，避免阻塞事件循环
-            user_input = await asyncio.to_thread(Prompt.ask, prompt_text)
+            # 使用 prompt_toolkit 异步获取输入
+            user_input = await input_session.prompt_async()
 
             if user_input.lower() in ("quit", "exit", "q"):
                 console.print("[dim]再见！[/dim]")
@@ -150,10 +150,19 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
 
             await agent.run(user_input)
 
+        except EOFError:
+            # 处理 Ctrl+D
+            console.print("\n[dim]再见！[/dim]")
+            break
         except KeyboardInterrupt:
             console.print("\n[dim]已中断。输入 'quit' 退出。[/dim]")
         except Exception as e:
-            console.print(f"[red]错误：{e}[/red]")
+            # 处理可能的编码问题
+            error_msg = str(e).encode("utf-8", errors="replace").decode("utf-8")
+            console.print(f"[red]错误：{error_msg}[/red]")
+            console.print(
+                "[dim]*** You may need to add PYTHONIOENCODING=utf-8 to your environment ***[/dim]"
+            )
 
 
 def main() -> None:

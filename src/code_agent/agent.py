@@ -194,6 +194,19 @@ class CodeAgent:
 
         return final_response
 
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        """清理文本中的无效 Unicode 字符（surrogate characters）。
+
+        Args:
+            text: 原始文本
+
+        Returns:
+            清理后的文本
+        """
+        # 移除 surrogate 字符（U+D800 到 U+DFFF）
+        return text.encode("utf-8", errors="surrogatepass").decode("utf-8", errors="replace")
+
     async def _call_api_stream(self) -> tuple[Any, str]:
         """使用流式 API 调用 Claude，实时渲染 Markdown 输出。
 
@@ -212,7 +225,9 @@ class CodeAgent:
             # 使用 Rich Live 实时渲染 Markdown
             with Live(Markdown(""), console=self.console, refresh_per_second=10) as live:
                 async for text in stream.text_stream:
-                    accumulated_text += text
+                    # 清理可能的无效字符
+                    clean_text = self._clean_text(text)
+                    accumulated_text += clean_text
                     # 实时更新 Markdown 渲染
                     live.update(Markdown(accumulated_text))
 
