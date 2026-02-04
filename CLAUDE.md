@@ -210,6 +210,35 @@ class BaseTool(ABC):
 ### Error Handling in Tools
 工具执行错误在 `_execute_tool_calls()` 中统一捕获，返回带 `is_error: True` 的工具结果给 Claude。不要在工具内部捕获所有异常。
 
+### UTF-8 Encoding Handling
+处理子进程输出和文件内容时必须正确处理 UTF-8 编码错误：
+
+**问题**：当子进程输出包含无效 UTF-8 字节序列时，`bytes.decode()` 默认会创建 Unicode 代理字符（U+D800-U+DFFF），这些字符在后续的 JSON 序列化或终端输出时会导致编码失败。
+
+**解决方案**：
+1. **源头防御**：在所有 `decode()` 调用处添加 `errors="replace"` 参数
+   ```python
+   stdout.decode(errors="replace")  # 将无效字节替换为 �
+   ```
+
+2. **输出防御**：在 JSON 序列化前清理数据中的 surrogate 字符
+   ```python
+   def _sanitize_for_json(obj: Any) -> Any:
+       if isinstance(obj, str):
+           return obj.encode("utf-8", errors="replace").decode("utf-8")
+       elif isinstance(obj, dict):
+           return {k: _sanitize_for_json(v) for k, v in obj.items()}
+       elif isinstance(obj, list):
+           return [_sanitize_for_json(item) for item in obj]
+       return obj
+   ```
+
+**已实施位置**：
+- [tools/file_ops.py:299](src/code_agent/tools/file_ops.py#L299): GrepTool 的 stderr 解码
+- [tools/file_ops.py:305](src/code_agent/tools/file_ops.py#L305): GrepTool 的 stdout 解码
+- [session.py:89-108](src/code_agent/session.py#L89-L108): SessionManager 的 `_sanitize_for_json()` 方法
+- [commands/export.py:11-29](src/code_agent/commands/export.py#L11-L29): ExportCommand 的数据清理函数
+
 ## Testing Strategy
 
 测试文件按模块组织：
