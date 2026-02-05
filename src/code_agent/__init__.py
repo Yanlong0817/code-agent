@@ -12,7 +12,6 @@ from code_agent.tools import (
     BaseTool,
     BashTool,
     EditTool,
-    GitTool,
     GlobTool,
     GrepTool,
     InsertTool,
@@ -49,8 +48,6 @@ __all__ = [
     "InsertTool",
     "GlobTool",
     "GrepTool",
-    # Git 工具
-    "GitTool",
     # 系统工具
     "BashTool",
     "AskUserQuestionTool",
