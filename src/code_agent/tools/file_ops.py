@@ -245,6 +245,132 @@ class InsertTool(BaseTool):
         return f"成功在 {file_path} 的{location}插入了 {insert_lines_count} 行"
 
 
+class ListDirectoryTool(BaseTool):
+    """列出目录内容，支持递归和树形显示。"""
+
+    name: ClassVar[str] = "ListDirectory"
+    description: ClassVar[str] = (
+        "列出目录内容，返回树形结构。支持递归深度控制和隐藏文件过滤。"
+        "适用于了解项目结构、查找文件位置。"
+    )
+
+    # 默认忽略的目录
+    DEFAULT_IGNORE = {".git", "__pycache__", "node_modules", ".venv", "venv", ".idea", ".vscode"}
+
+    class Input(BaseModel):
+        path: str = Field(default=".", description="要列出的目录路径")
+        depth: int = Field(default=2, ge=1, le=5, description="递归深度，1 表示只列当前层")
+        include_hidden: bool = Field(default=False, description="是否包含隐藏文件（.开头）")
+        ignore_patterns: list[str] | None = Field(
+            default=None, description="要忽略的目录名列表，默认忽略 .git、__pycache__ 等"
+        )
+
+    async def execute(  # type: ignore[override]
+        self,
+        path: str = ".",
+        depth: int = 2,
+        include_hidden: bool = False,
+        ignore_patterns: list[str] | None = None,
+    ) -> str:
+        """列出目录内容。
+
+        Args:
+            path: 目录路径
+            depth: 递归深度
+            include_hidden: 是否包含隐藏文件
+            ignore_patterns: 要忽略的目录名列表
+
+        Returns:
+            树形结构的目录内容
+        """
+        base_path = Path(path).resolve()
+
+        if not base_path.exists():
+            raise FileNotFoundError(f"目录未找到：{path}")
+
+        if not base_path.is_dir():
+            raise ValueError(f"路径不是目录：{path}")
+
+        ignore_set = set(ignore_patterns) if ignore_patterns else self.DEFAULT_IGNORE
+
+        lines: list[str] = []
+        file_count = 0
+        dir_count = 0
+        max_entries = 500  # 限制最大条目数
+
+        def should_include(p: Path) -> bool:
+            """判断是否应该包含该路径"""
+            name = p.name
+            # 隐藏文件检查
+            if not include_hidden and name.startswith("."):
+                return False
+            # 忽略模式检查
+            if name in ignore_set:
+                return False
+            return True
+
+        def build_tree(dir_path: Path, prefix: str, current_depth: int) -> None:
+            """递归构建目录树"""
+            nonlocal file_count, dir_count
+
+            if current_depth > depth or file_count + dir_count >= max_entries:
+                return
+
+            try:
+                entries = sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+            except PermissionError:
+                lines.append(f"{prefix}[权限不足]")
+                return
+
+            # 过滤条目
+            entries = [e for e in entries if should_include(e)]
+
+            for i, entry in enumerate(entries):
+                if file_count + dir_count >= max_entries:
+                    lines.append(f"{prefix}... (已达到 {max_entries} 条目限制)")
+                    return
+
+                is_last = i == len(entries) - 1
+                connector = "└── " if is_last else "├── "
+                child_prefix = prefix + ("    " if is_last else "│   ")
+
+                if entry.is_dir():
+                    dir_count += 1
+                    lines.append(f"{prefix}{connector}{entry.name}/")
+                    if current_depth < depth:
+                        build_tree(entry, child_prefix, current_depth + 1)
+                else:
+                    file_count += 1
+                    # 显示文件大小
+                    try:
+                        size = entry.stat().st_size
+                        size_str = self._format_size(size)
+                        lines.append(f"{prefix}{connector}{entry.name}  ({size_str})")
+                    except OSError:
+                        lines.append(f"{prefix}{connector}{entry.name}")
+
+        # 构建树
+        lines.append(f"{base_path.name}/")
+        build_tree(base_path, "", 1)
+
+        # 添加统计信息
+        summary = f"\n[共 {dir_count} 个目录，{file_count} 个文件]"
+        if file_count + dir_count >= max_entries:
+            summary += f" (已截断，达到 {max_entries} 条目限制)"
+
+        return "\n".join(lines) + summary
+
+    @staticmethod
+    def _format_size(size: int) -> str:
+        """格式化文件大小"""
+        if size < 1024:
+            return f"{size}B"
+        elif size < 1024 * 1024:
+            return f"{size / 1024:.1f}KB"
+        else:
+            return f"{size / (1024 * 1024):.1f}MB"
+
+
 class GlobTool(BaseTool):
     """查找匹配 glob 模式的文件。"""
 
