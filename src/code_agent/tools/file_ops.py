@@ -155,7 +155,7 @@ class EditTool(BaseTool):
         count = content.count(old_string)
 
         if count == 0:
-            raise ValueError(f"在文件中未找到字符串：{old_string[:100]}...")
+            raise ValueError(f"未找到精确匹配：{old_string[:100]}...")
 
         if count > 1 and not replace_all:
             raise ValueError(
@@ -221,7 +221,7 @@ class InsertTool(BaseTool):
 
         # 验证行号
         if insert_line > total_lines:
-            insert_line = total_lines - 1
+            raise ValueError(f"行号 {insert_line} 超出文件范围（文件共 {total_lines} 行）")
 
         # 确保插入文本以换行符结尾
         if insert_text and not insert_text.endswith("\n"):
