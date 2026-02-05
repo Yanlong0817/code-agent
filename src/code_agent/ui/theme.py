@@ -62,7 +62,6 @@ TOOL_ICONS: dict[str, str] = {
     "Grep": "🔎",
     "WebFetch": "🌐",
     "WebSearch": "🔍",
-    "TodoWrite": "📝",
     "AskUserQuestion": "💬",
 }
 

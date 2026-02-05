@@ -29,7 +29,6 @@ class ToolsCommand(BaseCommand):
             "Git": ["Git"],
             "系统交互": ["Bash", "AskUserQuestion"],
             "网络工具": ["WebFetch", "WebSearch"],
-            "任务管理": ["TodoWrite"],
         }
 
         # 创建工具到类别的映射
@@ -108,15 +107,13 @@ class ToolsCommand(BaseCommand):
             "Git": 1,
             "系统交互": 2,
             "网络工具": 3,
-            "任务管理": 4,
-            "其他": 5,
+            "其他": 4,
         }
         categories = {
             "文件操作": ["Read", "Write", "Edit", "Glob", "Grep"],
             "Git": ["Git"],
             "系统交互": ["Bash", "AskUserQuestion"],
             "网络工具": ["WebFetch", "WebSearch"],
-            "任务管理": ["TodoWrite"],
         }
         cat = self._get_tool_category(tool_name, categories)
         return (category_order.get(cat, 99), tool_name)
