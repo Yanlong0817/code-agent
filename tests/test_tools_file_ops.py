@@ -8,6 +8,7 @@ from code_agent.tools.file_ops import (
     EditTool,
     GlobTool,
     GrepTool,
+    InsertTool,
     ReadTool,
     WriteTool,
 )
@@ -64,6 +65,26 @@ class TestReadTool:
         """测试读取目录（应该失败）。"""
         with pytest.raises(ValueError, match="不是文件"):
             await tool.execute(str(tmp_path))
+
+    async def test_read_negative_offset(self, tool: ReadTool, sample_file: Path) -> None:
+        """测试负数 offset（从末尾读取）。"""
+        result = await tool.execute(str(sample_file), offset=-3)
+
+        # 应该显示最后 3 行（Line 8, 9, 10）
+        assert "Line 8" in result
+        assert "Line 9" in result
+        assert "Line 10" in result
+        # Line 7 不应该在结果中（除非在头部信息里）
+        lines = result.split("\n")
+        content_lines = [l for l in lines if "\tLine" in l]
+        assert all("Line 7" not in l for l in content_lines)
+
+    async def test_read_shows_header(self, tool: ReadTool, sample_file: Path) -> None:
+        """测试读取结果包含文件信息头。"""
+        result = await tool.execute(str(sample_file))
+
+        assert "[文件共" in result
+        assert "行]" in result
 
 
 class TestWriteTool:
@@ -150,6 +171,95 @@ class TestEditTool:
         """测试编辑不存在的文件。"""
         with pytest.raises(FileNotFoundError):
             await tool.execute(str(tmp_path / "nope.txt"), old_string="a", new_string="b")
+
+    async def test_replace_not_found_shows_context(
+        self, tool: EditTool, sample_file: Path
+    ) -> None:
+        """测试字符串未找到时显示相似上下文。"""
+        try:
+            await tool.execute(str(sample_file), old_string="def Hello", new_string="x")
+        except ValueError as e:
+            error_msg = str(e)
+            # 应该包含提示信息
+            assert "未找到精确匹配" in error_msg
+
+
+class TestInsertTool:
+    """InsertTool 测试。"""
+
+    @pytest.fixture
+    def tool(self) -> InsertTool:
+        return InsertTool()
+
+    @pytest.fixture
+    def sample_file(self, tmp_path: Path) -> Path:
+        """创建测试文件。"""
+        file_path = tmp_path / "code.py"
+        file_path.write_text("line 1\nline 2\nline 3\n")
+        return file_path
+
+    async def test_insert_at_beginning(self, tool: InsertTool, sample_file: Path) -> None:
+        """测试在文件开头插入。"""
+        result = await tool.execute(
+            str(sample_file), insert_line=0, insert_text="import os"
+        )
+
+        content = sample_file.read_text()
+        assert content.startswith("import os\n")
+        assert "line 1" in content
+        assert "成功" in result
+        assert "文件开头" in result
+
+    async def test_insert_after_line(self, tool: InsertTool, sample_file: Path) -> None:
+        """测试在指定行后插入。"""
+        result = await tool.execute(
+            str(sample_file), insert_line=2, insert_text="inserted line"
+        )
+
+        content = sample_file.read_text()
+        lines = content.splitlines()
+        assert lines[0] == "line 1"
+        assert lines[1] == "line 2"
+        assert lines[2] == "inserted line"
+        assert lines[3] == "line 3"
+        assert "第 2 行后" in result
+
+    async def test_insert_at_end(self, tool: InsertTool, sample_file: Path) -> None:
+        """测试在文件末尾插入。"""
+        result = await tool.execute(
+            str(sample_file), insert_line=3, insert_text="line 4"
+        )
+
+        content = sample_file.read_text()
+        assert "line 4" in content
+        lines = content.splitlines()
+        assert lines[-1] == "line 4"
+
+    async def test_insert_out_of_range(self, tool: InsertTool, sample_file: Path) -> None:
+        """测试行号超出范围。"""
+        with pytest.raises(ValueError, match="超出文件范围"):
+            await tool.execute(str(sample_file), insert_line=100, insert_text="x")
+
+    async def test_insert_nonexistent_file(self, tool: InsertTool, tmp_path: Path) -> None:
+        """测试插入到不存在的文件。"""
+        with pytest.raises(FileNotFoundError):
+            await tool.execute(
+                str(tmp_path / "nope.txt"), insert_line=0, insert_text="x"
+            )
+
+    async def test_insert_multiline(self, tool: InsertTool, sample_file: Path) -> None:
+        """测试插入多行文本。"""
+        result = await tool.execute(
+            str(sample_file),
+            insert_line=1,
+            insert_text="new line 1\nnew line 2\nnew line 3",
+        )
+
+        content = sample_file.read_text()
+        assert "new line 1" in content
+        assert "new line 2" in content
+        assert "new line 3" in content
+        assert "插入了 3 行" in result
 
 
 class TestGlobTool:

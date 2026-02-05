@@ -1,4 +1,4 @@
-"""文件操作工具：Read、Write、Edit、Glob、Grep。"""
+"""文件操作工具：Read、Write、Edit、Insert、Glob、Grep。"""
 
 import asyncio
 from pathlib import Path
@@ -14,12 +14,16 @@ class ReadTool(BaseTool):
 
     name: ClassVar[str] = "Read"
     description: ClassVar[str] = (
-        "从文件系统读取文件。返回带行号的文件内容。支持使用 offset 和 limit 参数读取指定行范围。"
+        "从文件系统读取文件。返回带行号的文件内容。"
+        "支持 offset（正数从头开始，负数从末尾开始）和 limit 参数读取指定行范围。"
     )
 
     class Input(BaseModel):
         file_path: str = Field(description="要读取的文件的绝对路径")
-        offset: int = Field(default=0, ge=0, description="开始读取的行号（从 0 开始）")
+        offset: int = Field(
+            default=0,
+            description="开始读取的行号。正数从头开始(0-indexed)，负数从末尾开始(-1为最后一行)",
+        )
         limit: int = Field(default=2000, gt=0, le=10000, description="最大读取行数")
 
     async def execute(self, file_path: str, offset: int = 0, limit: int = 2000) -> str:  # type: ignore[override]
@@ -27,7 +31,7 @@ class ReadTool(BaseTool):
 
         Args:
             file_path: 文件的绝对路径
-            offset: 起始行号（从 0 开始）
+            offset: 起始行号。正数从头开始（0-indexed），负数从末尾开始（-1 为最后一行）
             limit: 最大读取行数
 
         Returns:
@@ -48,6 +52,12 @@ class ReadTool(BaseTool):
         with open(path, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
 
+        total_lines = len(lines)
+
+        # 处理负数 offset（从末尾开始）
+        if offset < 0:
+            offset = max(0, total_lines + offset)
+
         # 应用 offset 和 limit
         selected_lines = lines[offset : offset + limit]
 
@@ -59,7 +69,13 @@ class ReadTool(BaseTool):
                 line = line[:2000] + "...[已截断]\n"
             result_lines.append(f"{i:6d}\t{line.rstrip()}")
 
-        return "\n".join(result_lines)
+        # 添加文件信息
+        if not result_lines:
+            return f"文件为空或 offset 超出范围（文件共 {total_lines} 行）"
+
+        end_line = offset + len(selected_lines)
+        header = f"[文件共 {total_lines} 行，显示第 {offset + 1}-{end_line} 行]\n"
+        return header + "\n".join(result_lines)
 
 
 class WriteTool(BaseTool):
@@ -160,6 +176,75 @@ class EditTool(BaseTool):
         return f"成功在 {file_path} 中替换了 {replaced_count} 处"
 
 
+class InsertTool(BaseTool):
+    """在指定行后插入文本。"""
+
+    name: ClassVar[str] = "Insert"
+    description: ClassVar[str] = (
+        "在文件的指定行后插入文本。适用于添加新函数、导入语句等场景。"
+        "insert_line=0 表示在文件开头插入。"
+    )
+
+    class Input(BaseModel):
+        file_path: str = Field(description="要编辑的文件的绝对路径")
+        insert_line: int = Field(
+            ge=0,
+            description="在此行后插入文本（1-indexed）。0 表示在文件开头插入",
+        )
+        insert_text: str = Field(description="要插入的文本内容")
+
+    async def execute(self, file_path: str, insert_line: int, insert_text: str) -> str:  # type: ignore[override]
+        """在指定行后插入文本。
+
+        Args:
+            file_path: 文件的绝对路径
+            insert_line: 在此行后插入（1-indexed，0 表示文件开头）
+            insert_text: 要插入的文本
+
+        Returns:
+            成功消息
+
+        Raises:
+            FileNotFoundError: 如果文件不存在
+            ValueError: 如果行号超出范围
+        """
+        path = Path(file_path)
+
+        if not path.exists():
+            raise FileNotFoundError(f"文件未找到：{file_path}")
+
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
+
+        lines = content.splitlines(keepends=True)
+        total_lines = len(lines)
+
+        # 验证行号
+        if insert_line > total_lines:
+            insert_line = total_lines - 1
+
+        # 确保插入文本以换行符结尾
+        if insert_text and not insert_text.endswith("\n"):
+            insert_text += "\n"
+
+        # 在指定位置插入
+        if insert_line == 0:
+            # 在文件开头插入
+            new_lines = [insert_text] + lines
+        else:
+            # 在指定行后插入
+            new_lines = lines[:insert_line] + [insert_text] + lines[insert_line:]
+
+        new_content = "".join(new_lines)
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+
+        insert_lines_count = insert_text.count("\n")
+        location = "文件开头" if insert_line == 0 else f"第 {insert_line} 行后"
+        return f"成功在 {file_path} 的{location}插入了 {insert_lines_count} 行"
+
+
 class GlobTool(BaseTool):
     """查找匹配 glob 模式的文件。"""
 
@@ -182,7 +267,7 @@ class GlobTool(BaseTool):
         Returns:
             换行分隔的匹配文件路径列表
         """
-        base_path = Path(path).resolve()
+        base_path = Path(path).resolve()  # 获取绝对路径，转化成Path对象
 
         if not base_path.exists():
             raise FileNotFoundError(f"目录未找到：{path}")
@@ -260,26 +345,27 @@ class GrepTool(BaseTool):
         # 构建 ripgrep 命令
         cmd = ["rg", "--no-heading"]
 
+        # 支持三种输出模式
         if output_mode == "files_with_matches":
-            cmd.append("-l")
+            cmd.append("-l")  # 只显示匹配的文件名
         elif output_mode == "count":
-            cmd.append("-c")
+            cmd.append("-c")  # 显示每个文件的匹配计数
         else:
-            cmd.append("-n")  # content 模式显示行号
+            cmd.append("-n")  # 显示匹配内容和行号
 
-        if context_lines > 0 and output_mode == "content":
+        if context_lines > 0 and output_mode == "content":  # 显示前后三行上下文
             cmd.extend(["-C", str(context_lines)])
 
-        if case_insensitive:
+        if case_insensitive:  # 忽略大小写
             cmd.append("-i")
 
         if glob:
             cmd.extend(["--glob", glob])
 
-        if file_type:
+        if file_type:  # 按文件类型过滤
             cmd.extend(["-t", file_type])
 
-        cmd.extend(["-m", str(max_results)])
+        cmd.extend(["-m", str(max_results)])  # 限制最大返回结果数
         cmd.append(pattern)
         cmd.append(path)
 

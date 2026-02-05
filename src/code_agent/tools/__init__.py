@@ -1,7 +1,7 @@
 """Code Agent 工具集 - 文件操作、系统交互和网络工具。"""
 
 from code_agent.tools.base import BaseTool, ToolRegistry
-from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, ReadTool, WriteTool
+from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, InsertTool, ReadTool, WriteTool
 from code_agent.tools.git import GitTool
 from code_agent.tools.network import WebFetchTool, WebSearchTool
 from code_agent.tools.system import AskUserQuestionTool, BashTool
@@ -13,6 +13,7 @@ __all__ = [
     "ReadTool",
     "WriteTool",
     "EditTool",
+    "InsertTool",
     "GlobTool",
     "GrepTool",
     "GitTool",

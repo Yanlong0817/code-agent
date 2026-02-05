@@ -15,6 +15,7 @@ from code_agent.tools import (
     GitTool,
     GlobTool,
     GrepTool,
+    InsertTool,
     ReadTool,
     TodoWriteTool,
     ToolRegistry,
@@ -45,6 +46,7 @@ __all__ = [
     "ReadTool",
     "WriteTool",
     "EditTool",
+    "InsertTool",
     "GlobTool",
     "GrepTool",
     # Git 工具

@@ -14,7 +14,7 @@ from rich.markdown import Markdown
 from code_agent.config import Config
 from code_agent.logging import get_logger
 from code_agent.tools.base import ToolRegistry
-from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, ReadTool, WriteTool
+from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, InsertTool, ReadTool, WriteTool
 from code_agent.tools.git import GitTool
 from code_agent.tools.network import WebFetchTool, WebSearchTool
 from code_agent.tools.system import AskUserQuestionTool, BashTool
@@ -101,6 +101,7 @@ class CodeAgent:
         self.registry.register(ReadTool())
         self.registry.register(WriteTool())
         self.registry.register(EditTool())
+        self.registry.register(InsertTool())
         self.registry.register(GlobTool())
         self.registry.register(GrepTool())
 

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add CLAUDE.md)",
+      "Bash(git commit -m \"docs: 更新 CLAUDE.md，添加 UTF-8 编码处理说明\")"
+    ]
+  }
+}
