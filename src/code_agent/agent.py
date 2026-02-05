@@ -17,7 +17,6 @@ from code_agent.tools.base import ToolRegistry
 from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, InsertTool, ReadTool, WriteTool
 from code_agent.tools.network import WebFetchTool, WebSearchTool
 from code_agent.tools.system import BashTool
-from code_agent.tools.task import TodoWriteTool
 from code_agent.ui import StatusBar, ToolDisplay
 
 if TYPE_CHECKING:
@@ -111,9 +110,6 @@ class CodeAgent:
         self.registry.register(WebFetchTool())
         web_search = WebSearchTool(api_key=self.config.tavily_api_key)
         self.registry.register(web_search)
-
-        # 任务管理
-        self.registry.register(TodoWriteTool())
 
     async def run(self, user_input: str) -> str:
         """使用用户输入运行 Agent。

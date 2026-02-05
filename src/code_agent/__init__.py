@@ -15,7 +15,6 @@ from code_agent.tools import (
     GrepTool,
     InsertTool,
     ReadTool,
-    TodoWriteTool,
     ToolRegistry,
     WebFetchTool,
     WebSearchTool,
@@ -52,6 +51,4 @@ __all__ = [
     # 网络工具
     "WebFetchTool",
     "WebSearchTool",
-    # 任务管理
-    "TodoWriteTool",
 ]

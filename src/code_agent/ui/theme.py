@@ -77,6 +77,5 @@ SPINNER_TEXT: dict[str, str] = {
     "Grep": "Searching content",
     "WebFetch": "Fetching URL",
     "WebSearch": "Searching web",
-    "TodoWrite": "Updating tasks",
     "AskUserQuestion": "Waiting for input",
 }
