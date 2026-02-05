@@ -8,7 +8,6 @@ from code_agent.logging import get_logger, setup_logging
 from code_agent.safety import SafetyCheck, SafetyChecker, get_safety_checker
 from code_agent.session import Session, SessionManager, SessionMetadata
 from code_agent.tools import (
-    AskUserQuestionTool,
     BaseTool,
     BashTool,
     EditTool,
@@ -50,7 +49,6 @@ __all__ = [
     "GrepTool",
     # 系统工具
     "BashTool",
-    "AskUserQuestionTool",
     # 网络工具
     "WebFetchTool",
     "WebSearchTool",

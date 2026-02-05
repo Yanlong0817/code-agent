@@ -1,13 +1,9 @@
-"""系统交互工具：Bash、AskUserQuestion。"""
+"""系统交互工具：Bash。"""
 
 import asyncio
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
-from rich.console import Console
-from rich.panel import Panel
-from rich.prompt import Prompt
-from rich.table import Table
 
 from code_agent.safety import check_command_safety, confirm_dangerous_action
 from code_agent.tools.base import BaseTool
@@ -67,8 +63,9 @@ class BashTool(BaseTool):
         timeout_seconds = timeout / 1000
 
         try:
+            # 异步创建子进程
             proc = await asyncio.create_subprocess_shell(
-                command,
+                command,  # 传入命令
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=working_dir,
@@ -100,104 +97,3 @@ class BashTool(BaseTool):
 
         except TimeoutError:
             raise TimeoutError(f"命令超时（{timeout_seconds} 秒）")
-
-
-class AskUserQuestionTool(BaseTool):
-    """交互式向用户提问。"""
-
-    name: ClassVar[str] = "AskUserQuestion"
-    description: ClassVar[str] = "向用户提问以收集信息、澄清需求或获取实现选择的决定。"
-
-    class Option(BaseModel):
-        label: str = Field(description="此选项的显示文本")
-        description: str = Field(default="", description="此选项的说明")
-
-    class Question(BaseModel):
-        question: str = Field(description="要问的问题")
-        header: str = Field(description="问题的简短标签（最多 12 个字符）")
-        options: list["AskUserQuestionTool.Option"] = Field(
-            min_length=2, max_length=4, description="可用选项"
-        )
-        multi_select: bool = Field(default=False, description="允许多选")
-
-    class Input(BaseModel):
-        questions: list["AskUserQuestionTool.Question"] = Field(
-            min_length=1, max_length=4, description="要问的问题（1-4 个）"
-        )
-
-    def __init__(self) -> None:
-        self.console = Console()
-
-    async def execute(self, questions: list[dict[str, Any]]) -> dict[str, Any]:  # type: ignore[override]
-        """提问并收集答案。
-
-        Args:
-            questions: 问题字典列表
-
-        Returns:
-            问题文本到选择答案的映射字典
-        """
-        answers = {}
-
-        for q in questions:
-            question_text = q["question"]
-            header = q.get("header", "问题")
-            options = q.get("options", [])
-            multi_select = q.get("multi_select", False)
-
-            # 构建选项表格
-            table = Table(show_header=False, box=None, padding=(0, 2))
-            table.add_column("序号", style="cyan")
-            table.add_column("选项")
-            table.add_column("说明", style="dim")
-
-            for i, opt in enumerate(options, 1):
-                label = opt.get("label", f"选项 {i}")
-                desc = opt.get("description", "")
-                table.add_row(f"[{i}]", label, desc)
-
-            # 添加"其他"选项
-            table.add_row(f"[{len(options) + 1}]", "其他", "提供自定义输入")
-
-            # 显示问题
-            self.console.print()
-            self.console.print(Panel(question_text, title=header, border_style="blue"))
-            self.console.print(table)
-            self.console.print()
-
-            if multi_select:
-                prompt_text = "输入数字，用逗号分隔（如 1,3）"
-            else:
-                prompt_text = "输入数字"
-
-            while True:
-                choice = Prompt.ask(prompt_text)
-
-                try:
-                    if multi_select:
-                        indices = [int(x.strip()) for x in choice.split(",")]
-                        selected = []
-                        for idx in indices:
-                            if idx == len(options) + 1:
-                                custom = Prompt.ask("输入自定义值")
-                                selected.append(custom)
-                            elif 1 <= idx <= len(options):
-                                selected.append(options[idx - 1].get("label", ""))
-                            else:
-                                raise ValueError("无效选择")
-                        answers[question_text] = ", ".join(selected)
-                        break
-                    else:
-                        idx = int(choice)
-                        if idx == len(options) + 1:
-                            custom = Prompt.ask("输入自定义值")
-                            answers[question_text] = custom
-                        elif 1 <= idx <= len(options):
-                            answers[question_text] = options[idx - 1].get("label", "")
-                        else:
-                            raise ValueError("无效选择")
-                        break
-                except (ValueError, IndexError):
-                    self.console.print("[red]输入无效，请重试[/red]")
-
-        return answers

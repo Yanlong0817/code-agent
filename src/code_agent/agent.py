@@ -16,7 +16,7 @@ from code_agent.logging import get_logger
 from code_agent.tools.base import ToolRegistry
 from code_agent.tools.file_ops import EditTool, GlobTool, GrepTool, InsertTool, ReadTool, WriteTool
 from code_agent.tools.network import WebFetchTool, WebSearchTool
-from code_agent.tools.system import AskUserQuestionTool, BashTool
+from code_agent.tools.system import BashTool
 from code_agent.tools.task import TodoWriteTool
 from code_agent.ui import StatusBar, ToolDisplay
 
@@ -106,7 +106,6 @@ class CodeAgent:
 
         # 系统工具
         self.registry.register(BashTool())
-        self.registry.register(AskUserQuestionTool())
 
         # 网络工具
         self.registry.register(WebFetchTool())

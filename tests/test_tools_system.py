@@ -70,7 +70,3 @@ class TestBashTool:
         """测试通过 __call__ 调用（带验证）。"""
         result = await tool(command="echo 'test'")
         assert "test" in result
-
-
-# AskUserQuestionTool 需要交互式输入，不适合自动化测试
-# 可以通过 mock 来测试，但这里略过
