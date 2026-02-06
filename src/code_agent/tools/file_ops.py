@@ -7,6 +7,7 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel, Field
 
 from code_agent.tools.base import BaseTool
+from code_agent.utils.diff import generate_unified_diff
 
 
 class ReadTool(BaseTool):
@@ -117,6 +118,7 @@ class EditTool(BaseTool):
     name: ClassVar[str] = "Edit"
     description: ClassVar[str] = (
         "在文件中执行精确的字符串替换。除非 replace_all 为 True，否则 old_string 必须在文件中唯一。"
+        "支持 preview 模式：设置 preview=True 可以先查看修改预览（diff），不实际修改文件。"
     )
 
     class Input(BaseModel):
@@ -124,9 +126,18 @@ class EditTool(BaseTool):
         old_string: str = Field(description="要替换的精确文本")
         new_string: str = Field(description="替换后的文本")
         replace_all: bool = Field(default=False, description="如果为 True，替换所有匹配项")
+        preview: bool = Field(
+            default=False,
+            description="如果为 True，仅显示修改预览（diff），不实际修改文件",
+        )
 
     async def execute(  # type: ignore[override]
-        self, file_path: str, old_string: str, new_string: str, replace_all: bool = False
+        self,
+        file_path: str,
+        old_string: str,
+        new_string: str,
+        replace_all: bool = False,
+        preview: bool = False,
     ) -> str:
         """替换文件中的文本。
 
@@ -135,9 +146,10 @@ class EditTool(BaseTool):
             old_string: 要查找和替换的文本
             new_string: 替换文本
             replace_all: 如果为 True，替换所有匹配项
+            preview: 如果为 True，仅显示修改预览（diff），不实际修改文件
 
         Returns:
-            包含替换次数的成功消息
+            包含替换次数和 diff 的成功消息，或预览模式下的 diff
 
         Raises:
             FileNotFoundError: 如果文件不存在
@@ -169,11 +181,19 @@ class EditTool(BaseTool):
         else:
             new_content = content.replace(old_string, new_string, 1)
 
+        # 生成 diff
+        diff_output = generate_unified_diff(content, new_content, file_path)
+
+        # 如果是预览模式，返回 diff 不实际修改
+        if preview:
+            return f"[预览模式] 将进行以下修改：\n\n{diff_output}\n\n使用 preview=False 执行实际修改"
+
+        # 实际写入文件
         with open(path, "w", encoding="utf-8") as f:
             f.write(new_content)
 
         replaced_count = count if replace_all else 1
-        return f"成功在 {file_path} 中替换了 {replaced_count} 处"
+        return f"成功在 {file_path} 中替换了 {replaced_count} 处\n\n修改详情：\n{diff_output}"
 
 
 class InsertTool(BaseTool):
