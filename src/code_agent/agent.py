@@ -102,17 +102,19 @@ class CodeAgent:
 
     def _register_tools(self) -> None:
         """注册所有可用工具。"""
+        workspace = self.config.working_directory
+
         # 文件操作
-        self.registry.register(ReadTool())
-        self.registry.register(WriteTool())
-        self.registry.register(EditTool())
-        self.registry.register(InsertTool())
-        self.registry.register(ListDirectoryTool())
-        self.registry.register(GlobTool())
-        self.registry.register(GrepTool())
+        self.registry.register(ReadTool(working_directory=workspace))
+        self.registry.register(WriteTool(working_directory=workspace))
+        self.registry.register(EditTool(working_directory=workspace))
+        self.registry.register(InsertTool(working_directory=workspace))
+        self.registry.register(ListDirectoryTool(working_directory=workspace))
+        self.registry.register(GlobTool(working_directory=workspace))
+        self.registry.register(GrepTool(working_directory=workspace))
 
         # 系统工具
-        self.registry.register(BashTool())
+        self.registry.register(BashTool(default_working_dir=workspace))
 
         # 网络工具
         self.registry.register(WebFetchTool())

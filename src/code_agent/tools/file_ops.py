@@ -6,11 +6,51 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, Field
 
+from code_agent.safety import confirm_dangerous_action, get_safety_checker
 from code_agent.tools.base import BaseTool
 from code_agent.utils.diff import generate_unified_diff
 
 
-class ReadTool(BaseTool):
+class _PathGuardedTool(BaseTool):
+    """带工作目录隔离和敏感文件检查的工具基类。"""
+
+    def __init__(self, working_directory: str | Path | None = None) -> None:
+        self._working_directory = (
+            Path(working_directory).expanduser().resolve(strict=False)
+            if working_directory is not None
+            else None
+        )
+
+    def _resolve_path(self, raw_path: str) -> Path:
+        """将输入路径解析为绝对路径，并校验是否在工作目录内。"""
+        path = Path(raw_path).expanduser()
+
+        if not path.is_absolute():
+            base = self._working_directory or Path.cwd()
+            path = base / path
+
+        resolved = path.resolve(strict=False)
+        self._ensure_within_workspace(resolved)
+        return resolved
+
+    def _ensure_within_workspace(self, path: Path) -> None:
+        """校验路径是否在工作目录边界内。"""
+        if self._working_directory is None:
+            return
+
+        if path != self._working_directory and self._working_directory not in path.parents:
+            raise PermissionError(f"路径超出工作目录范围：{path}")
+
+    def _confirm_sensitive_path(self, path: Path, operation: str) -> None:
+        """访问敏感路径时要求用户确认。"""
+        check = get_safety_checker().check_file_access(str(path), operation=operation)
+        if check.is_dangerous and not confirm_dangerous_action(
+            check, f"{operation} 文件", str(path)
+        ):
+            raise PermissionError(f"[已取消] 用户拒绝{operation}敏感文件：{path}")
+
+
+class ReadTool(_PathGuardedTool):
     """读取文件内容，支持行号范围。"""
 
     name: ClassVar[str] = "Read"
@@ -42,13 +82,14 @@ class ReadTool(BaseTool):
             FileNotFoundError: 如果文件不存在
             PermissionError: 如果文件无法读取
         """
-        path = Path(file_path)
+        path = self._resolve_path(file_path)
+        self._confirm_sensitive_path(path, "读取")
 
         if not path.exists():
-            raise FileNotFoundError(f"文件未找到：{file_path}")
+            raise FileNotFoundError(f"文件未找到：{path}")
 
         if not path.is_file():
-            raise ValueError(f"路径不是文件：{file_path}")
+            raise ValueError(f"路径不是文件：{path}")
 
         with open(path, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
@@ -79,7 +120,7 @@ class ReadTool(BaseTool):
         return header + "\n".join(result_lines)
 
 
-class WriteTool(BaseTool):
+class WriteTool(_PathGuardedTool):
     """写入文件内容，必要时创建目录。"""
 
     name: ClassVar[str] = "Write"
@@ -101,7 +142,8 @@ class WriteTool(BaseTool):
         Returns:
             成功消息
         """
-        path = Path(file_path)
+        path = self._resolve_path(file_path)
+        self._confirm_sensitive_path(path, "写入")
 
         # 必要时创建父目录
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,10 +151,10 @@ class WriteTool(BaseTool):
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        return f"成功写入 {len(content)} 字节到 {file_path}"
+        return f"成功写入 {len(content)} 字节到 {path}"
 
 
-class EditTool(BaseTool):
+class EditTool(_PathGuardedTool):
     """通过替换文本字符串编辑文件。"""
 
     name: ClassVar[str] = "Edit"
@@ -155,10 +197,11 @@ class EditTool(BaseTool):
             FileNotFoundError: 如果文件不存在
             ValueError: 如果 old_string 未找到或不唯一
         """
-        path = Path(file_path)
+        path = self._resolve_path(file_path)
+        self._confirm_sensitive_path(path, "编辑")
 
         if not path.exists():
-            raise FileNotFoundError(f"文件未找到：{file_path}")
+            raise FileNotFoundError(f"文件未找到：{path}")
 
         with open(path, encoding="utf-8") as f:
             content = f.read()
@@ -186,7 +229,11 @@ class EditTool(BaseTool):
 
         # 如果是预览模式，返回 diff 不实际修改
         if preview:
-            return f"[预览模式] 将进行以下修改：\n\n{diff_output}\n\n使用 preview=False 执行实际修改"
+            return (
+                "[预览模式] 将进行以下修改：\n\n"
+                f"{diff_output}\n\n"
+                "使用 preview=False 执行实际修改"
+            )
 
         # 实际写入文件
         with open(path, "w", encoding="utf-8") as f:
@@ -196,7 +243,7 @@ class EditTool(BaseTool):
         return f"成功在 {file_path} 中替换了 {replaced_count} 处\n\n修改详情：\n{diff_output}"
 
 
-class InsertTool(BaseTool):
+class InsertTool(_PathGuardedTool):
     """在指定行后插入文本。"""
 
     name: ClassVar[str] = "Insert"
@@ -228,10 +275,11 @@ class InsertTool(BaseTool):
             FileNotFoundError: 如果文件不存在
             ValueError: 如果行号超出范围
         """
-        path = Path(file_path)
+        path = self._resolve_path(file_path)
+        self._confirm_sensitive_path(path, "插入")
 
         if not path.exists():
-            raise FileNotFoundError(f"文件未找到：{file_path}")
+            raise FileNotFoundError(f"文件未找到：{path}")
 
         with open(path, encoding="utf-8") as f:
             content = f.read()
@@ -265,7 +313,7 @@ class InsertTool(BaseTool):
         return f"成功在 {file_path} 的{location}插入了 {insert_lines_count} 行"
 
 
-class ListDirectoryTool(BaseTool):
+class ListDirectoryTool(_PathGuardedTool):
     """列出目录内容，支持递归和树形显示。"""
 
     name: ClassVar[str] = "ListDirectory"
@@ -303,13 +351,14 @@ class ListDirectoryTool(BaseTool):
         Returns:
             树形结构的目录内容
         """
-        base_path = Path(path).resolve()
+        base_path = self._resolve_path(path)
+        self._confirm_sensitive_path(base_path, "访问")
 
         if not base_path.exists():
-            raise FileNotFoundError(f"目录未找到：{path}")
+            raise FileNotFoundError(f"目录未找到：{base_path}")
 
         if not base_path.is_dir():
-            raise ValueError(f"路径不是目录：{path}")
+            raise ValueError(f"路径不是目录：{base_path}")
 
         ignore_set = set(ignore_patterns) if ignore_patterns else self.DEFAULT_IGNORE
 
@@ -391,7 +440,7 @@ class ListDirectoryTool(BaseTool):
             return f"{size / (1024 * 1024):.1f}MB"
 
 
-class GlobTool(BaseTool):
+class GlobTool(_PathGuardedTool):
     """查找匹配 glob 模式的文件。"""
 
     name: ClassVar[str] = "Glob"
@@ -413,10 +462,11 @@ class GlobTool(BaseTool):
         Returns:
             换行分隔的匹配文件路径列表
         """
-        base_path = Path(path).resolve()  # 获取绝对路径，转化成Path对象
+        base_path = self._resolve_path(path)
+        self._confirm_sensitive_path(base_path, "访问")
 
         if not base_path.exists():
-            raise FileNotFoundError(f"目录未找到：{path}")
+            raise FileNotFoundError(f"目录未找到：{base_path}")
 
         # 查找匹配的文件
         matches = list(base_path.glob(pattern))
@@ -440,7 +490,7 @@ class GlobTool(BaseTool):
         return "\n".join(result)
 
 
-class GrepTool(BaseTool):
+class GrepTool(_PathGuardedTool):
     """使用 ripgrep 搜索文件内容。"""
 
     name: ClassVar[str] = "Grep"
@@ -488,6 +538,9 @@ class GrepTool(BaseTool):
         Returns:
             基于 output_mode 的搜索结果
         """
+        search_path = self._resolve_path(path)
+        self._confirm_sensitive_path(search_path, "访问")
+
         # 构建 ripgrep 命令
         cmd = ["rg", "--no-heading"]
 
@@ -513,7 +566,7 @@ class GrepTool(BaseTool):
 
         cmd.extend(["-m", str(max_results)])  # 限制最大返回结果数
         cmd.append(pattern)
-        cmd.append(path)
+        cmd.append(str(search_path))
 
         try:
             proc = await asyncio.create_subprocess_exec(

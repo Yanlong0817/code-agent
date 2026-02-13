@@ -84,7 +84,7 @@ CODE_AGENT_MAX_TOKENS=4096                    # 最大响应 token
 CODE_AGENT_MAX_ITERATIONS=50                  # 最大迭代次数
 
 # 可选 - 运行设置
-CODE_AGENT_WORKING_DIR=/path/to/project       # 工作目录
+CODE_AGENT_WORKING_DIR=/path/to/project       # 工具可访问的工作目录边界
 CODE_AGENT_VERBOSE=false                      # 详细输出
 
 # 可选 - 日志设置
@@ -402,7 +402,7 @@ ruff format src/
 - ✅ 危险命令自动检测（`rm -rf`, `sudo`, `git push --force` 等）
 - ✅ 敏感文件保护（`.env`, `.ssh/`, `credentials` 等）
 - ✅ 用户确认机制（高风险操作需要确认）
-- ✅ 沙箱模式支持（可选）
+- ✅ 工作目录隔离（默认启用，禁止越界访问）
 - ✅ UTF-8 编码安全处理
 
 ## 📚 技术栈

@@ -76,8 +76,8 @@ class TestReadTool:
         assert "Line 10" in result
         # Line 7 不应该在结果中（除非在头部信息里）
         lines = result.split("\n")
-        content_lines = [l for l in lines if "\tLine" in l]
-        assert all("Line 7" not in l for l in content_lines)
+        content_lines = [line for line in lines if "\tLine" in line]
+        assert all("Line 7" not in line for line in content_lines)
 
     async def test_read_shows_header(self, tool: ReadTool, sample_file: Path) -> None:
         """测试读取结果包含文件信息头。"""
@@ -226,7 +226,7 @@ class TestInsertTool:
 
     async def test_insert_at_end(self, tool: InsertTool, sample_file: Path) -> None:
         """测试在文件末尾插入。"""
-        result = await tool.execute(
+        await tool.execute(
             str(sample_file), insert_line=3, insert_text="line 4"
         )
 
@@ -306,6 +306,48 @@ class TestGlobTool:
         """测试在不存在的目录中搜索。"""
         with pytest.raises(FileNotFoundError):
             await tool.execute("*", str(tmp_path / "nonexistent"))
+
+
+class TestFileWorkspaceIsolation:
+    """文件工具工作目录隔离测试。"""
+
+    async def test_read_blocks_outside_workspace(self, tmp_path: Path) -> None:
+        """测试读取工作目录外文件会被拒绝。"""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        outside_file = tmp_path / "outside.txt"
+        outside_file.write_text("outside")
+
+        tool = ReadTool(working_directory=workspace)
+        with pytest.raises(PermissionError, match="超出工作目录范围"):
+            await tool.execute(str(outside_file))
+
+    async def test_write_relative_path_uses_workspace(self, tmp_path: Path) -> None:
+        """测试相对路径会落在工作目录内。"""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        tool = WriteTool(working_directory=workspace)
+        await tool.execute("nested/notes.txt", "hello")
+
+        output_file = workspace / "nested" / "notes.txt"
+        assert output_file.exists()
+        assert output_file.read_text() == "hello"
+
+    async def test_sensitive_file_requires_confirmation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """测试访问敏感文件时会要求确认。"""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        env_file = workspace / ".env"
+        env_file.write_text("SECRET=1")
+
+        monkeypatch.setattr("code_agent.tools.file_ops.confirm_dangerous_action", lambda *_: False)
+
+        tool = ReadTool(working_directory=workspace)
+        with pytest.raises(PermissionError, match="用户拒绝"):
+            await tool.execute(str(env_file))
 
 
 def has_ripgrep() -> bool:

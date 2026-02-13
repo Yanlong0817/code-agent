@@ -35,6 +35,34 @@ class TestBashTool:
         result = await tool.execute("pwd", working_dir=str(tmp_path))
         assert str(tmp_path) in result
 
+    async def test_default_working_dir(self, tmp_path: Path) -> None:
+        """测试默认工作目录。"""
+        tool = BashTool(default_working_dir=tmp_path)
+        result = await tool.execute("pwd")
+        assert str(tmp_path.resolve()) in result
+
+    async def test_relative_working_dir_with_default_workspace(self, tmp_path: Path) -> None:
+        """测试相对 working_dir 按默认工作目录解析。"""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        subdir = workspace / "sub"
+        subdir.mkdir()
+
+        tool = BashTool(default_working_dir=workspace)
+        result = await tool.execute("pwd", working_dir="sub")
+        assert str(subdir.resolve()) in result
+
+    async def test_working_dir_outside_workspace_rejected(self, tmp_path: Path) -> None:
+        """测试工作目录越界会被拒绝。"""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+
+        tool = BashTool(default_working_dir=workspace)
+        with pytest.raises(PermissionError, match="超出允许范围"):
+            await tool.execute("pwd", working_dir=str(outside))
+
     async def test_command_timeout(self, tool: BashTool) -> None:
         """测试命令超时。"""
         with pytest.raises(TimeoutError):
