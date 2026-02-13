@@ -230,9 +230,7 @@ class EditTool(_PathGuardedTool):
         # 如果是预览模式，返回 diff 不实际修改
         if preview:
             return (
-                "[预览模式] 将进行以下修改：\n\n"
-                f"{diff_output}\n\n"
-                "使用 preview=False 执行实际修改"
+                f"[预览模式] 将进行以下修改：\n\n{diff_output}\n\n使用 preview=False 执行实际修改"
             )
 
         # 实际写入文件
