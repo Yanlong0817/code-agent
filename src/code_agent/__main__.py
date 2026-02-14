@@ -118,6 +118,49 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _generate_session_title(messages: list[dict]) -> str:
+    """从第一条用户消息生成会话标题。"""
+    for msg in messages:
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            title = content.replace("\n", " ").strip()
+            if len(title) > 50:
+                title = title[:47] + "..."
+            return title
+    return ""
+
+
+def _auto_save_session(agent: CodeAgent, console: Console) -> None:
+    """退出前自动保存当前会话。"""
+    messages = agent.messages
+    if not messages:
+        return
+
+    manager = SessionManager()
+    try:
+        if agent._current_session:
+            session = agent._current_session
+            if not session.metadata.title:
+                session.metadata.title = _generate_session_title(messages)
+        else:
+            session = manager.create(
+                model=agent.config.model,
+                title=_generate_session_title(messages),
+            )
+            agent._current_session = session
+
+        session.messages = messages
+        path = manager.save(session)
+        label = session.metadata.title or session.metadata.id
+        console.print(f"[dim]已自动保存会话：{label}[/dim]")
+        console.print(f"[dim]保存位置：{path}[/dim]")
+    except Exception as e:
+        error_msg = str(e).encode("utf-8", errors="replace").decode("utf-8")
+        console.print(f"[yellow]自动保存失败：{error_msg}[/yellow]")
+
+
 async def run_interactive(agent: CodeAgent, console: Console) -> None:
     """运行交互模式。
 
@@ -137,6 +180,7 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
             user_input = await input_session.prompt_async()
 
             if user_input.lower() in ("quit", "exit", "q"):
+                _auto_save_session(agent, console)
                 console.print("[dim]再见！[/dim]")
                 break
 
@@ -152,6 +196,7 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
 
         except EOFError:
             # 处理 Ctrl+D
+            _auto_save_session(agent, console)
             console.print("\n[dim]再见！[/dim]")
             break
         except KeyboardInterrupt:
