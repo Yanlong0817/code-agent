@@ -426,9 +426,7 @@ class ApplyPatchTool(_PathGuardedTool):
                 if marker == " ":
                     if line_idx >= len(original_lines) or original_lines[line_idx] != content:
                         got = (
-                            original_lines[line_idx]
-                            if line_idx < len(original_lines)
-                            else "<EOF>"
+                            original_lines[line_idx] if line_idx < len(original_lines) else "<EOF>"
                         )
                         raise ValueError(
                             f"补丁上下文不匹配：{target_path}，期望 {content!r}，实际 {got!r}"
@@ -438,9 +436,7 @@ class ApplyPatchTool(_PathGuardedTool):
                 elif marker == "-":
                     if line_idx >= len(original_lines) or original_lines[line_idx] != content:
                         got = (
-                            original_lines[line_idx]
-                            if line_idx < len(original_lines)
-                            else "<EOF>"
+                            original_lines[line_idx] if line_idx < len(original_lines) else "<EOF>"
                         )
                         raise ValueError(
                             f"补丁删除行不匹配：{target_path}，期望 {content!r}，实际 {got!r}"

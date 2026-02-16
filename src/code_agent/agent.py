@@ -276,9 +276,7 @@ class CodeAgent:
         summary_message = {
             "role": "user",
             "content": (
-                "[上下文压缩摘要]\n"
-                f"{summary_text}\n\n"
-                "请在后续回答中将以上内容视为既有历史上下文。"
+                f"[上下文压缩摘要]\n{summary_text}\n\n请在后续回答中将以上内容视为既有历史上下文。"
             ),
         }
         recent_messages = self.messages[-keep_recent:]
@@ -287,16 +285,12 @@ class CodeAgent:
         self._last_input_tokens = 0
         self.status_bar.token_usage.reset()
 
-        logger.info(
-            "已触发上下文压缩 (%s): %d -> %d 条消息", reason, old_count, len(self.messages)
-        )
+        logger.info("已触发上下文压缩 (%s): %d -> %d 条消息", reason, old_count, len(self.messages))
         compact_msg = (
             f"[dim]上下文已自动压缩（{reason}）："
             f"{old_count} 条历史 -> {len(self.messages)} 条[/dim]"
         )
-        self.console.print(
-            compact_msg
-        )
+        self.console.print(compact_msg)
 
     async def _call_api_stream(self) -> tuple[Any, str]:
         """使用流式 API 调用 Claude，实时渲染 Markdown 输出。
