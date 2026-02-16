@@ -1,6 +1,8 @@
-"""文件操作工具：Read、Write、Edit、Insert、Glob、Grep。"""
+"""文件操作工具：Read、Write、Edit、ApplyPatch、Insert、Glob、Grep。"""
 
 import asyncio
+import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Literal
 
@@ -9,6 +11,32 @@ from pydantic import BaseModel, Field
 from code_agent.safety import confirm_dangerous_action, get_safety_checker
 from code_agent.tools.base import BaseTool
 from code_agent.utils.diff import generate_unified_diff
+
+HUNK_HEADER_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+
+@dataclass
+class _PatchHunk:
+    old_start: int
+    old_count: int
+    new_start: int
+    new_count: int
+    lines: list[str]
+
+
+@dataclass
+class _FilePatch:
+    old_path: str | None
+    new_path: str | None
+    hunks: list[_PatchHunk]
+
+
+@dataclass
+class _PatchOperation:
+    action: Literal["create", "update", "delete"]
+    path: Path
+    old_content: str
+    new_content: str
 
 
 class _PathGuardedTool(BaseTool):
@@ -241,6 +269,288 @@ class EditTool(_PathGuardedTool):
         return f"成功在 {file_path} 中替换了 {replaced_count} 处\n\n修改详情：\n{diff_output}"
 
 
+class ApplyPatchTool(_PathGuardedTool):
+    """应用 unified diff 补丁。"""
+
+    name: ClassVar[str] = "ApplyPatch"
+    description: ClassVar[str] = (
+        "将 unified diff 补丁应用到文件。支持新增、修改、删除文件，"
+        "并遵循工作目录边界和敏感文件安全确认。"
+    )
+
+    class Input(BaseModel):
+        patch: str = Field(description="要应用的 unified diff 补丁文本")
+        dry_run: bool = Field(default=False, description="如果为 True，仅验证并预览，不实际写入")
+
+    async def execute(self, patch: str, dry_run: bool = False) -> str:  # type: ignore[override]
+        """应用补丁。"""
+        file_patches = self._parse_patch(patch)
+        if not file_patches:
+            raise ValueError("补丁中未找到可应用的文件变更")
+
+        operations: list[_PatchOperation] = []
+
+        for file_patch in file_patches:
+            # /dev/null <-> path：新增或删除
+            # path <-> path：修改（暂不支持重命名）
+            if (
+                file_patch.old_path
+                and file_patch.new_path
+                and file_patch.old_path != file_patch.new_path
+            ):
+                raise ValueError(
+                    f"暂不支持重命名补丁：{file_patch.old_path} -> {file_patch.new_path}"
+                )
+
+            target_raw_path = file_patch.new_path or file_patch.old_path
+            if target_raw_path is None:
+                raise ValueError("无效补丁：old_path 和 new_path 不能同时为空")
+
+            target_path = self._resolve_path(target_raw_path)
+
+            if file_patch.old_path is None and file_patch.new_path is not None:
+                # create
+                self._confirm_sensitive_path(target_path, "写入")
+                if target_path.exists():
+                    raise ValueError(f"新增文件补丁目标已存在：{target_path}")
+                new_content = self._build_patched_content([], file_patch.hunks, str(target_path))
+                operations.append(
+                    _PatchOperation(
+                        action="create",
+                        path=target_path,
+                        old_content="",
+                        new_content=new_content,
+                    )
+                )
+                continue
+
+            if file_patch.new_path is None and file_patch.old_path is not None:
+                # delete
+                self._confirm_sensitive_path(target_path, "删除")
+                if not target_path.exists():
+                    raise FileNotFoundError(f"删除补丁目标不存在：{target_path}")
+                if not target_path.is_file():
+                    raise ValueError(f"删除补丁目标不是文件：{target_path}")
+                with open(target_path, encoding="utf-8", errors="replace") as f:
+                    old_content = f.read()
+                new_content = self._build_patched_content(
+                    old_content.splitlines(keepends=True),
+                    file_patch.hunks,
+                    str(target_path),
+                )
+                if new_content:
+                    raise ValueError(f"删除补丁应用后文件内容非空，拒绝删除：{target_path}")
+                operations.append(
+                    _PatchOperation(
+                        action="delete",
+                        path=target_path,
+                        old_content=old_content,
+                        new_content="",
+                    )
+                )
+                continue
+
+            # update
+            self._confirm_sensitive_path(target_path, "编辑")
+            if not target_path.exists():
+                raise FileNotFoundError(f"修改补丁目标不存在：{target_path}")
+            if not target_path.is_file():
+                raise ValueError(f"修改补丁目标不是文件：{target_path}")
+            with open(target_path, encoding="utf-8", errors="replace") as f:
+                old_content = f.read()
+            new_content = self._build_patched_content(
+                old_content.splitlines(keepends=True),
+                file_patch.hunks,
+                str(target_path),
+            )
+            operations.append(
+                _PatchOperation(
+                    action="update",
+                    path=target_path,
+                    old_content=old_content,
+                    new_content=new_content,
+                )
+            )
+
+        # dry-run: 仅返回变更预览
+        if dry_run:
+            return self._format_patch_result(operations, dry_run=True)
+
+        # 所有补丁都验证通过后再执行，避免半应用状态
+        for op in operations:
+            if op.action == "delete":
+                op.path.unlink()
+                continue
+
+            op.path.parent.mkdir(parents=True, exist_ok=True)
+            with open(op.path, "w", encoding="utf-8") as f:
+                f.write(op.new_content)
+
+        return self._format_patch_result(operations, dry_run=False)
+
+    def _build_patched_content(
+        self,
+        original_lines: list[str],
+        hunks: list[_PatchHunk],
+        target_path: str,
+    ) -> str:
+        """将 hunks 应用到原始行，返回新内容。"""
+        result: list[str] = []
+        cursor = 0
+
+        for hunk in hunks:
+            old_start_idx = hunk.old_start - 1
+            if hunk.old_start == 0 and hunk.old_count == 0:
+                old_start_idx = 0
+            if old_start_idx < 0:
+                raise ValueError(f"补丁 hunk 起始行无效：{target_path} @ {hunk.old_start}")
+            if old_start_idx < cursor:
+                raise ValueError(f"补丁 hunk 存在重叠：{target_path} @ {hunk.old_start}")
+            if old_start_idx > len(original_lines):
+                raise ValueError(f"补丁 hunk 超出文件范围：{target_path} @ {hunk.old_start}")
+
+            result.extend(original_lines[cursor:old_start_idx])
+            line_idx = old_start_idx
+
+            for hunk_line in hunk.lines:
+                if not hunk_line:
+                    continue
+                marker = hunk_line[0]
+                if marker == "\\":
+                    # "\ No newline at end of file" 注释行，不参与内容匹配
+                    continue
+                if marker not in (" ", "+", "-"):
+                    raise ValueError(f"补丁行格式无效：{hunk_line!r}")
+
+                content = hunk_line[1:]
+                if marker == " ":
+                    if line_idx >= len(original_lines) or original_lines[line_idx] != content:
+                        got = (
+                            original_lines[line_idx]
+                            if line_idx < len(original_lines)
+                            else "<EOF>"
+                        )
+                        raise ValueError(
+                            f"补丁上下文不匹配：{target_path}，期望 {content!r}，实际 {got!r}"
+                        )
+                    result.append(original_lines[line_idx])
+                    line_idx += 1
+                elif marker == "-":
+                    if line_idx >= len(original_lines) or original_lines[line_idx] != content:
+                        got = (
+                            original_lines[line_idx]
+                            if line_idx < len(original_lines)
+                            else "<EOF>"
+                        )
+                        raise ValueError(
+                            f"补丁删除行不匹配：{target_path}，期望 {content!r}，实际 {got!r}"
+                        )
+                    line_idx += 1
+                else:  # marker == "+"
+                    result.append(content)
+
+            cursor = line_idx
+
+        result.extend(original_lines[cursor:])
+        return "".join(result)
+
+    def _parse_patch(self, patch: str) -> list[_FilePatch]:
+        """解析 unified diff。"""
+        lines = patch.splitlines(keepends=True)
+        idx = 0
+        files: list[_FilePatch] = []
+
+        while idx < len(lines):
+            line = lines[idx]
+            if not line.startswith("--- "):
+                idx += 1
+                continue
+
+            old_path = self._normalize_diff_path(line[4:])
+            idx += 1
+            if idx >= len(lines) or not lines[idx].startswith("+++ "):
+                raise ValueError("补丁格式错误：缺少 '+++ <path>' 行")
+
+            new_path = self._normalize_diff_path(lines[idx][4:])
+            idx += 1
+
+            hunks: list[_PatchHunk] = []
+            while idx < len(lines):
+                current = lines[idx]
+                if current.startswith("--- "):
+                    break
+                if not current.startswith("@@ "):
+                    idx += 1
+                    continue
+
+                header = current.rstrip("\n")
+                match = HUNK_HEADER_RE.match(header)
+                if not match:
+                    raise ValueError(f"无法解析 hunk 头：{header}")
+
+                old_start = int(match.group(1))
+                old_count = int(match.group(2) or "1")
+                new_start = int(match.group(3))
+                new_count = int(match.group(4) or "1")
+                idx += 1
+
+                hunk_lines: list[str] = []
+                while idx < len(lines):
+                    hunk_line = lines[idx]
+                    if hunk_line.startswith("@@ ") or hunk_line.startswith("--- "):
+                        break
+                    if hunk_line.startswith((" ", "+", "-", "\\")):
+                        hunk_lines.append(hunk_line)
+                    idx += 1
+
+                hunks.append(
+                    _PatchHunk(
+                        old_start=old_start,
+                        old_count=old_count,
+                        new_start=new_start,
+                        new_count=new_count,
+                        lines=hunk_lines,
+                    )
+                )
+
+            if not hunks:
+                raise ValueError("补丁格式错误：文件变更缺少 hunk")
+
+            files.append(_FilePatch(old_path=old_path, new_path=new_path, hunks=hunks))
+
+        return files
+
+    @staticmethod
+    def _normalize_diff_path(raw_path: str) -> str | None:
+        """规范化 diff 路径。"""
+        token = raw_path.strip().split("\t", 1)[0]
+        token = token.split(" ", 1)[0]
+        if token == "/dev/null":
+            return None
+        if token.startswith("a/") or token.startswith("b/"):
+            token = token[2:]
+        return token
+
+    def _format_patch_result(self, operations: list[_PatchOperation], dry_run: bool) -> str:
+        """格式化补丁执行结果。"""
+        lines = ["[预览] 补丁验证通过，将执行以下变更：" if dry_run else "补丁应用成功："]
+        for op in operations:
+            if op.action == "create":
+                lines.append(f"- 新增 {op.path}")
+            elif op.action == "delete":
+                lines.append(f"- 删除 {op.path}")
+            else:
+                lines.append(f"- 修改 {op.path}")
+            diff_output = generate_unified_diff(
+                op.old_content,
+                op.new_content,
+                str(op.path),
+                max_lines=120,
+            )
+            lines.append(diff_output)
+        return "\n".join(lines)
+
+
 class InsertTool(_PathGuardedTool):
     """在指定行后插入文本。"""
 
@@ -288,6 +598,10 @@ class InsertTool(_PathGuardedTool):
         # 验证行号
         if insert_line > total_lines:
             raise ValueError(f"行号 {insert_line} 超出文件范围（文件共 {total_lines} 行）")
+
+        # 处理文件末尾没有换行符的情况，确保“在最后一行后插入”时不会黏连在同一行
+        if insert_line == total_lines and total_lines > 0 and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
 
         # 确保插入文本以换行符结尾
         if insert_text and not insert_text.endswith("\n"):

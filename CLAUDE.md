@@ -182,6 +182,10 @@ class BaseTool(ABC):
 - `CODE_AGENT_MODEL`: 模型名称（默认：claude-sonnet-4-20250514）
 - `CODE_AGENT_MAX_TOKENS`: 最大响应 token（默认：4096）
 - `CODE_AGENT_MAX_ITERATIONS`: 最大迭代次数（默认：50）
+- `CODE_AGENT_AUTO_COMPACT`: 是否启用上下文自动压缩（默认：true）
+- `CODE_AGENT_AUTO_COMPACT_THRESHOLD`: 压缩触发阈值（默认：0.8）
+- `CODE_AGENT_AUTO_COMPACT_KEEP_RECENT`: 压缩后保留最近消息数（默认：8）
+- `CODE_AGENT_AUTO_COMPACT_SUMMARY_MAX_TOKENS`: 摘要最大 token（默认：2048）
 - `CODE_AGENT_WORKING_DIR`: 工作目录
 - `CODE_AGENT_VERBOSE`: 详细输出
 - `CODE_AGENT_LOG_LEVEL`: 日志级别（DEBUG/INFO/WARNING/ERROR）
@@ -254,7 +258,7 @@ class BaseTool(ABC):
 
 - `agent.py`: Agent 主循环和 API 交互
 - `tools/base.py`: 工具基类和注册表
-- `tools/file_ops.py`: 文件操作工具（Read/Write/Edit/Glob/Grep）
+- `tools/file_ops.py`: 文件操作工具（Read/Write/Edit/ApplyPatch/Insert/Glob/Grep）
 - `safety.py`: 安全检查系统
 - `session.py`: 会话管理
 - `commands/handler.py`: 命令处理器

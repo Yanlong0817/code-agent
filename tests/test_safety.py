@@ -73,6 +73,12 @@ class TestSafetyChecker:
         result = checker.check_command("rm -rf *")
         assert result.is_dangerous is True
 
+        result = checker.check_command("rm -rf .")
+        assert result.is_dangerous is True
+
+        result = checker.check_command("rm -fr ./")
+        assert result.is_dangerous is True
+
     def test_check_sudo(self, checker: SafetyChecker) -> None:
         """测试检查 sudo 命令。"""
         result = checker.check_command("sudo apt update")

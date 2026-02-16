@@ -10,7 +10,7 @@ from rich.prompt import Confirm
 # 危险命令模式
 DANGEROUS_PATTERNS: list[tuple[str, str, str]] = [
     # (正则模式, 危险级别, 说明)
-    (r"\brm\s+(-[rfRF]+\s+)*(/|~|\*|\.\.)", "high", "删除重要目录或使用通配符"),
+    (r"\brm\s+(-[rfRF]+\s+)*(/|~|\*|\.\.|\.(?:/)?)($|\s)", "high", "删除重要目录或使用通配符"),
     (r"\brm\s+-[rfRF]*\s+\*", "high", "使用 rm 删除通配符匹配的文件"),
     (r"\bsudo\b", "medium", "使用管理员权限执行命令"),
     (r"\bchmod\s+777\b", "medium", "设置过于宽松的文件权限"),

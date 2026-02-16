@@ -59,6 +59,32 @@ class Config(BaseSettings):
         description="Agent 循环的最大迭代次数",
         alias="CODE_AGENT_MAX_ITERATIONS",
     )
+    auto_compact_enabled: bool = Field(
+        default=True,
+        description="是否启用上下文自动压缩",
+        alias="CODE_AGENT_AUTO_COMPACT",
+    )
+    auto_compact_threshold: float = Field(
+        default=0.8,
+        ge=0.5,
+        le=0.98,
+        description="触发上下文压缩的阈值（输入 token / 上下文上限）",
+        alias="CODE_AGENT_AUTO_COMPACT_THRESHOLD",
+    )
+    auto_compact_keep_recent_messages: int = Field(
+        default=8,
+        ge=2,
+        le=50,
+        description="压缩后保留的最近消息数量",
+        alias="CODE_AGENT_AUTO_COMPACT_KEEP_RECENT",
+    )
+    auto_compact_summary_max_tokens: int = Field(
+        default=2048,
+        ge=256,
+        le=8192,
+        description="压缩摘要生成时的最大输出 token",
+        alias="CODE_AGENT_AUTO_COMPACT_SUMMARY_MAX_TOKENS",
+    )
 
     # 输出设置
     verbose: bool = Field(

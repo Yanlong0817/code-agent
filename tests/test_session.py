@@ -211,6 +211,24 @@ class TestSessionManager:
         results = session_manager.search("JavaScript")
         assert len(results) == 1
 
+    def test_search_nested_message_content(self, session_manager: SessionManager) -> None:
+        """测试搜索嵌套消息内容（assistant/tool 结构）。"""
+        session = session_manager.create(model="test-model", title="Nested")
+        session.messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": "This mentions NestedKeyword"},
+                    {"type": "tool_use", "name": "Read", "input": {"file_path": "README.md"}},
+                ],
+            }
+        ]
+        session_manager.save(session)
+
+        results = session_manager.search("nestedkeyword")
+        assert len(results) == 1
+        assert results[0].id == session.metadata.id
+
     def test_get_latest(self, session_manager: SessionManager) -> None:
         """测试获取最新会话。"""
         # 空时返回 None

@@ -82,6 +82,9 @@ class ModelCommand(BaseCommand):
         """
         old_model = self.agent.config.model
         self.agent.config.model = model_name
+        status_bar = getattr(self.agent, "status_bar", None)
+        if status_bar is not None and hasattr(status_bar, "update_model"):
+            status_bar.update_model(model_name)
 
         if old_model == model_name:
             self.agent.console.print(f"[dim]模型未变更，仍为 {model_name}[/dim]")

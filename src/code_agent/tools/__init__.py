@@ -2,6 +2,7 @@
 
 from code_agent.tools.base import BaseTool, ToolRegistry
 from code_agent.tools.file_ops import (
+    ApplyPatchTool,
     EditTool,
     GlobTool,
     GrepTool,
@@ -19,6 +20,7 @@ __all__ = [
     "ReadTool",
     "WriteTool",
     "EditTool",
+    "ApplyPatchTool",
     "InsertTool",
     "ListDirectoryTool",
     "GlobTool",

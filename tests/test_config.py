@@ -25,6 +25,8 @@ class TestConfig:
         assert config.model == "claude-sonnet-4-20250514"
         assert config.max_tokens == 4096
         assert config.max_iterations == 50
+        assert config.auto_compact_enabled is True
+        assert config.auto_compact_threshold == 0.8
         assert config.verbose is False
 
     def test_from_env(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -34,6 +36,7 @@ class TestConfig:
         monkeypatch.setenv("TAVILY_API_KEY", "test-tavily-key")
         monkeypatch.setenv("CODE_AGENT_MODEL", "claude-3-opus")
         monkeypatch.setenv("CODE_AGENT_MAX_TOKENS", "8192")
+        monkeypatch.setenv("CODE_AGENT_AUTO_COMPACT_THRESHOLD", "0.9")
         monkeypatch.setenv("CODE_AGENT_VERBOSE", "true")
 
         config = Config.from_env()
@@ -42,6 +45,7 @@ class TestConfig:
         assert config.tavily_api_key == "test-tavily-key"
         assert config.model == "claude-3-opus"
         assert config.max_tokens == 8192
+        assert config.auto_compact_threshold == 0.9
         assert config.verbose is True
 
     def test_validate_required_missing_api_key(

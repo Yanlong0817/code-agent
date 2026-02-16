@@ -4,7 +4,7 @@
 
 ## ✨ 核心特性
 
-- 🔧 **插件化工具系统** - 10 个内置工具，易于扩展
+- 🔧 **插件化工具系统** - 11 个内置工具，易于扩展
 - 💬 **交互式命令** - 9 个内置命令，支持会话管理
 - 🔒 **安全检查** - 危险操作自动检测和确认
 - 📝 **会话管理** - 保存/加载对话历史
@@ -13,10 +13,11 @@
 
 ## 🛠️ 工具列表
 
-### 文件操作（7个工具）
+### 文件操作（8个工具）
 - **Read** - 读取文件内容，支持行号范围和偏移
 - **Write** - 创建或覆盖文件，自动创建目录
 - **Edit** - 精确字符串替换，支持预览模式（diff）
+- **ApplyPatch** - 应用 unified diff 补丁（新增/修改/删除）
 - **Insert** - 在指定行后插入文本
 - **ListDirectory** - 树形显示目录结构，支持递归
 - **Glob** - 文件模式匹配搜索（如 `**/*.py`）
@@ -86,6 +87,10 @@ CODE_AGENT_MAX_ITERATIONS=50                  # 最大迭代次数
 # 可选 - 运行设置
 CODE_AGENT_WORKING_DIR=/path/to/project       # 工具可访问的工作目录边界
 CODE_AGENT_VERBOSE=false                      # 详细输出
+CODE_AGENT_AUTO_COMPACT=true                  # 启用上下文自动压缩
+CODE_AGENT_AUTO_COMPACT_THRESHOLD=0.8         # 触发压缩阈值
+CODE_AGENT_AUTO_COMPACT_KEEP_RECENT=8         # 压缩后保留最近消息数
+CODE_AGENT_AUTO_COMPACT_SUMMARY_MAX_TOKENS=2048  # 摘要最大 token
 
 # 可选 - 日志设置
 CODE_AGENT_LOG_LEVEL=INFO                     # 日志级别（DEBUG/INFO/WARNING/ERROR）
@@ -354,8 +359,8 @@ ruff format src/
 ### 项目统计
 
 - **代码行数**: ~3000+ 行 Python 代码
-- **测试覆盖**: 8 个测试文件，覆盖核心功能
-- **工具数量**: 10 个内置工具
+- **测试覆盖**: 9 个测试文件，覆盖核心功能
+- **工具数量**: 11 个内置工具
 - **命令数量**: 9 个交互式命令
 
 ## 🏗️ 架构设计

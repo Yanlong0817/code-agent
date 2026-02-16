@@ -8,6 +8,7 @@ from code_agent.logging import get_logger, setup_logging
 from code_agent.safety import SafetyCheck, SafetyChecker, get_safety_checker
 from code_agent.session import Session, SessionManager, SessionMetadata
 from code_agent.tools import (
+    ApplyPatchTool,
     BaseTool,
     BashTool,
     EditTool,
@@ -43,6 +44,7 @@ __all__ = [
     "ReadTool",
     "WriteTool",
     "EditTool",
+    "ApplyPatchTool",
     "InsertTool",
     "GlobTool",
     "GrepTool",

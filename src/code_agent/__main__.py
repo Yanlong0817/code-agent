@@ -230,7 +230,7 @@ def main() -> None:
         if args.log_level:
             config.log_level = args.log_level
         if args.log_file:
-            config.log_file = args.log_file
+            config.log_file = Path(args.log_file)
         if args.working_dir:
             config.working_directory = Path(args.working_dir)
 

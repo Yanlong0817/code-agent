@@ -8,6 +8,7 @@ import pytest
 from code_agent.commands.base import BaseCommand, CommandRegistry
 from code_agent.commands.handler import CommandHandler
 from code_agent.commands.model import AVAILABLE_MODELS, ModelCommand
+from code_agent.commands.tools import ToolsCommand
 
 
 class MockCommand(BaseCommand):
@@ -120,6 +121,10 @@ class TestCommandHandler:
         assert result is True
         # 应该显示错误信息
         mock_agent.console.print.assert_called()
+        help_panel = mock_agent.console.print.call_args_list[1].args[0]
+        from rich.panel import Panel
+
+        assert isinstance(help_panel, Panel)
 
     async def test_execute_non_command(self, handler: CommandHandler) -> None:
         """测试执行非命令输入。"""
@@ -137,6 +142,7 @@ class TestModelCommand:
         agent.console = MagicMock()
         agent.config = MagicMock()
         agent.config.model = "claude-sonnet-4-20250514"
+        agent.status_bar = MagicMock()
         return agent
 
     @pytest.fixture
@@ -150,6 +156,7 @@ class TestModelCommand:
         await command.execute("claude-opus-4-5-20251101")
 
         assert mock_agent.config.model == "claude-opus-4-5-20251101"
+        mock_agent.status_bar.update_model.assert_called_once_with("claude-opus-4-5-20251101")
 
     async def test_execute_with_invalid_model(
         self, command: ModelCommand, mock_agent: MagicMock
@@ -183,3 +190,16 @@ class TestModelCommand:
             assert isinstance(description, str)
             assert len(model_id) > 0
             assert len(description) > 0
+
+
+class TestToolsCommand:
+    """ToolsCommand 测试。"""
+
+    def test_file_tools_category_mapping(self) -> None:
+        """测试新增文件工具分类。"""
+        command = ToolsCommand(MagicMock())
+
+        assert command._get_tool_category("ApplyPatch", command.TOOL_CATEGORIES) == "文件操作"
+        assert command._get_tool_category("Insert", command.TOOL_CATEGORIES) == "文件操作"
+        assert command._get_tool_category("ListDirectory", command.TOOL_CATEGORIES) == "文件操作"
+        assert command._get_category_order("ApplyPatch")[0] == command.CATEGORY_ORDER["文件操作"]

@@ -13,6 +13,26 @@ class ToolsCommand(BaseCommand):
 
     name: ClassVar[str] = "tools"
     description: ClassVar[str] = "列出所有可用工具"
+    TOOL_CATEGORIES: ClassVar[dict[str, list[str]]] = {
+        "文件操作": [
+            "Read",
+            "Write",
+            "Edit",
+            "ApplyPatch",
+            "Insert",
+            "ListDirectory",
+            "Glob",
+            "Grep",
+        ],
+        "系统交互": ["Bash"],
+        "网络工具": ["WebFetch", "WebSearch"],
+    }
+    CATEGORY_ORDER: ClassVar[dict[str, int]] = {
+        "文件操作": 0,
+        "系统交互": 1,
+        "网络工具": 2,
+        "其他": 3,
+    }
 
     async def execute(self, args: str) -> None:
         """显示所有可用工具列表。
@@ -24,18 +44,7 @@ class ToolsCommand(BaseCommand):
         tools = self.agent.registry.get_all()
 
         # 按类别分组工具
-        categories = {
-            "文件操作": ["Read", "Write", "Edit", "Glob", "Grep"],
-            "Git": ["Git"],
-            "系统交互": ["Bash", "AskUserQuestion"],
-            "网络工具": ["WebFetch", "WebSearch"],
-        }
-
-        # 创建工具到类别的映射
-        tool_category = {}
-        for cat, prefixes in categories.items():
-            for prefix in prefixes:
-                tool_category[prefix] = cat
+        categories = self.TOOL_CATEGORIES
 
         # 主表格
         table = Table(
@@ -102,18 +111,7 @@ class ToolsCommand(BaseCommand):
         Returns:
             排序键元组
         """
-        category_order = {
-            "文件操作": 0,
-            "Git": 1,
-            "系统交互": 2,
-            "网络工具": 3,
-            "其他": 4,
-        }
-        categories = {
-            "文件操作": ["Read", "Write", "Edit", "Glob", "Grep"],
-            "Git": ["Git"],
-            "系统交互": ["Bash", "AskUserQuestion"],
-            "网络工具": ["WebFetch", "WebSearch"],
-        }
+        category_order = self.CATEGORY_ORDER
+        categories = self.TOOL_CATEGORIES
         cat = self._get_tool_category(tool_name, categories)
         return (category_order.get(cat, 99), tool_name)

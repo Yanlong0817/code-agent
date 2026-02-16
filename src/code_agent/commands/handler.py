@@ -115,7 +115,7 @@ class CommandHandler:
             else:
                 # 无匹配，显示帮助
                 self.agent.console.print(f"[red]未知命令：/{command_name}[/red]")
-                self.agent.console.print(f"[dim]{self.registry.get_help()}[/dim]")
+                self.agent.console.print(self.registry.get_help())
                 return True
 
         # 执行命令

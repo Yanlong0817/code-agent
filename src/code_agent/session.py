@@ -107,6 +107,16 @@ class SessionManager:
             return [self._sanitize_for_json(item) for item in obj]
         return obj
 
+    def _contains_keyword(self, obj: Any, keyword_lower: str) -> bool:
+        """递归检查对象中是否包含关键词。"""
+        if isinstance(obj, str):
+            return keyword_lower in obj.lower()
+        if isinstance(obj, dict):
+            return any(self._contains_keyword(v, keyword_lower) for v in obj.values())
+        if isinstance(obj, list):
+            return any(self._contains_keyword(item, keyword_lower) for item in obj)
+        return False
+
     def save(self, session: Session) -> Path:
         """保存会话。
 
@@ -240,8 +250,10 @@ class SessionManager:
                 # 在消息内容中搜索
                 messages = data.get("messages", [])
                 for msg in messages:
+                    if not isinstance(msg, dict):
+                        continue
                     content = msg.get("content", "")
-                    if isinstance(content, str) and keyword_lower in content.lower():
+                    if self._contains_keyword(content, keyword_lower):
                         results.append(SessionMetadata.model_validate(metadata))
                         break
             except (json.JSONDecodeError, KeyError, ValueError, OSError):

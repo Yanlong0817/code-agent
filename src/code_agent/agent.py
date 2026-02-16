@@ -15,6 +15,7 @@ from code_agent.config import Config
 from code_agent.logging import get_logger
 from code_agent.tools.base import ToolRegistry
 from code_agent.tools.file_ops import (
+    ApplyPatchTool,
     EditTool,
     GlobTool,
     GrepTool,
@@ -48,6 +49,12 @@ class CodeAgent:
 4. 当需求不明确时提出澄清问题
 
 始终解释你在做什么以及为什么这样做。"""
+    COMPACTION_PROMPT = """请将此前对话历史压缩为可继续工作的摘要，要求：
+1. 保留用户目标、约束与偏好。
+2. 保留已完成工作、关键决策、错误与修复。
+3. 保留后续继续所需的具体上下文（文件路径、命令、参数、结果）。
+4. 保留未完成事项与下一步建议。
+5. 输出简洁、结构化的中文摘要。"""
 
     def __init__(self, config: Config | None = None) -> None:
         """初始化 Agent。
@@ -86,6 +93,7 @@ class CodeAgent:
 
         # 当前会话（用于会话管理命令）
         self._current_session: Any = None
+        self._last_input_tokens: int = 0
 
     @property
     def command_handler(self) -> CommandHandler:
@@ -108,6 +116,7 @@ class CodeAgent:
         self.registry.register(ReadTool(working_directory=workspace))
         self.registry.register(WriteTool(working_directory=workspace))
         self.registry.register(EditTool(working_directory=workspace))
+        self.registry.register(ApplyPatchTool(working_directory=workspace))
         self.registry.register(InsertTool(working_directory=workspace))
         self.registry.register(ListDirectoryTool(working_directory=workspace))
         self.registry.register(GlobTool(working_directory=workspace))
@@ -143,6 +152,8 @@ class CodeAgent:
             self.status_bar.update_iteration(iteration)
             logger.debug("迭代 %d/%d", iteration, self.config.max_iterations)
 
+            await self._maybe_compact_context(self._last_input_tokens, reason="pre_request")
+
             if self.config.verbose:
                 self.console.print(f"[dim]迭代 {iteration}[/dim]")
 
@@ -152,7 +163,10 @@ class CodeAgent:
             logger.debug("API 响应停止原因: %s", response.stop_reason)
 
             # 更新 token 使用量
+            current_input_tokens = 0
             if hasattr(response, "usage"):
+                current_input_tokens = response.usage.input_tokens
+                self._last_input_tokens = current_input_tokens
                 self.status_bar.update_tokens(
                     response.usage.input_tokens,
                     response.usage.output_tokens,
@@ -184,6 +198,7 @@ class CodeAgent:
 
             # 检查停止原因
             if response.stop_reason == "end_turn":
+                await self._maybe_compact_context(current_input_tokens, reason="post_turn")
                 logger.info("Agent 完成处理，共 %d 次迭代", iteration)
                 # 显示状态栏
                 self.console.print(self.status_bar.render_simple())
@@ -208,6 +223,80 @@ class CodeAgent:
         """
         # 移除 surrogate 字符（U+D800 到 U+DFFF）
         return text.encode("utf-8", errors="surrogatepass").decode("utf-8", errors="replace")
+
+    def _should_compact_context(self, input_tokens: int) -> bool:
+        """判断是否需要触发上下文自动压缩。"""
+        if not self.config.auto_compact_enabled:
+            return False
+        if input_tokens <= 0:
+            return False
+        context_limit = self.status_bar.token_usage.context_limit
+        if context_limit <= 0:
+            return False
+        threshold_tokens = int(context_limit * self.config.auto_compact_threshold)
+        return input_tokens >= threshold_tokens
+
+    async def _maybe_compact_context(self, input_tokens: int, reason: str) -> None:
+        """在满足条件时尝试进行上下文压缩。"""
+        if not self._should_compact_context(input_tokens):
+            return
+        try:
+            await self._compact_context(reason=reason)
+        except Exception as e:
+            logger.warning("上下文压缩失败: %s", e)
+
+    async def _compact_context(self, reason: str) -> None:
+        """压缩历史上下文，保留最近消息以继续对话。"""
+        keep_recent = min(self.config.auto_compact_keep_recent_messages, len(self.messages))
+        if keep_recent <= 0:
+            return
+        if len(self.messages) <= keep_recent:
+            return
+
+        historical_messages = self.messages[:-keep_recent]
+        if not historical_messages:
+            return
+
+        summary_response = await self.client.messages.create(
+            model=self.config.model,
+            max_tokens=self.config.auto_compact_summary_max_tokens,
+            messages=cast(
+                Any,
+                historical_messages + [{"role": "user", "content": self.COMPACTION_PROMPT}],
+            ),
+        )
+
+        summary_parts = [
+            block.text for block in summary_response.content if getattr(block, "type", "") == "text"
+        ]
+        summary_text = "\n".join(part.strip() for part in summary_parts if part.strip()).strip()
+        if not summary_text:
+            raise ValueError("未能生成可用的上下文摘要")
+
+        summary_message = {
+            "role": "user",
+            "content": (
+                "[上下文压缩摘要]\n"
+                f"{summary_text}\n\n"
+                "请在后续回答中将以上内容视为既有历史上下文。"
+            ),
+        }
+        recent_messages = self.messages[-keep_recent:]
+        old_count = len(self.messages)
+        self.messages = [summary_message, *recent_messages]
+        self._last_input_tokens = 0
+        self.status_bar.token_usage.reset()
+
+        logger.info(
+            "已触发上下文压缩 (%s): %d -> %d 条消息", reason, old_count, len(self.messages)
+        )
+        compact_msg = (
+            f"[dim]上下文已自动压缩（{reason}）："
+            f"{old_count} 条历史 -> {len(self.messages)} 条[/dim]"
+        )
+        self.console.print(
+            compact_msg
+        )
 
     async def _call_api_stream(self) -> tuple[Any, str]:
         """使用流式 API 调用 Claude，实时渲染 Markdown 输出。
@@ -322,3 +411,4 @@ class CodeAgent:
         self.messages = []
         self.status_bar.reset()
         self._current_session = None
+        self._last_input_tokens = 0

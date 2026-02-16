@@ -1,5 +1,6 @@
 """CLI 主入口相关测试。"""
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -84,3 +85,57 @@ def test_auto_save_updates_existing_session(tmp_path, monkeypatch: pytest.Monkey
     loaded = manager.load(session.metadata.id)
     assert loaded.messages == agent.messages
     assert loaded.metadata.title == "更新会话内容"
+
+
+def test_main_converts_log_file_to_path(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """测试 main 会将 --log-file 参数转换为 Path。"""
+
+    class DummyAgent:
+        def __init__(self, config) -> None:
+            self.config = config
+            self.messages = []
+            self._current_session = None
+
+        async def run(self, user_input: str) -> str:
+            return user_input
+
+    fake_config = SimpleNamespace(
+        model="claude-sonnet-4-20250514",
+        max_tokens=4096,
+        max_iterations=50,
+        verbose=False,
+        log_level="INFO",
+        log_file=tmp_path / "default.log",
+        working_directory=tmp_path,
+        validate_required=lambda: None,
+    )
+    log_file_arg = tmp_path / "cli.log"
+    args = SimpleNamespace(
+        prompt=["hello"],
+        model=None,
+        load=None,
+        continue_session=False,
+        max_tokens=None,
+        max_iterations=None,
+        verbose=False,
+        no_banner=True,
+        log_level=None,
+        log_file=str(log_file_arg),
+        working_dir=None,
+    )
+
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(main_module, "parse_args", lambda: args)
+    monkeypatch.setattr(main_module.Config, "from_env", staticmethod(lambda: fake_config))
+    monkeypatch.setattr(main_module, "CodeAgent", DummyAgent)
+    monkeypatch.setattr(
+        main_module,
+        "setup_logging",
+        lambda level, log_file: captured.update({"level": level, "log_file": log_file}),
+    )
+
+    main_module.main()
+
+    assert fake_config.log_file == Path(log_file_arg)
+    assert isinstance(captured["log_file"], Path)

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from code_agent.tools.file_ops import (
+    ApplyPatchTool,
     EditTool,
     GlobTool,
     GrepTool,
@@ -235,6 +236,17 @@ class TestInsertTool:
         lines = content.splitlines()
         assert lines[-1] == "line 4"
 
+    async def test_insert_at_end_without_trailing_newline(
+        self, tool: InsertTool, tmp_path: Path
+    ) -> None:
+        """测试末尾无换行时在最后一行后插入。"""
+        file_path = tmp_path / "single_line.txt"
+        file_path.write_text("abc")
+
+        await tool.execute(str(file_path), insert_line=1, insert_text="X")
+
+        assert file_path.read_text() == "abc\nX\n"
+
     async def test_insert_out_of_range(self, tool: InsertTool, sample_file: Path) -> None:
         """测试行号超出范围。"""
         with pytest.raises(ValueError, match="超出文件范围"):
@@ -260,6 +272,80 @@ class TestInsertTool:
         assert "new line 2" in content
         assert "new line 3" in content
         assert "插入了 3 行" in result
+
+
+class TestApplyPatchTool:
+    """ApplyPatchTool 测试。"""
+
+    @pytest.fixture
+    def tool(self, tmp_path: Path) -> ApplyPatchTool:
+        return ApplyPatchTool(working_directory=tmp_path)
+
+    async def test_apply_patch_update_file(self, tool: ApplyPatchTool, tmp_path: Path) -> None:
+        """测试修改已有文件。"""
+        target = tmp_path / "sample.txt"
+        target.write_text("line1\nline2\n")
+        patch = (
+            "--- a/sample.txt\n"
+            "+++ b/sample.txt\n"
+            "@@ -1,2 +1,2 @@\n"
+            "-line1\n"
+            "+lineA\n"
+            " line2\n"
+        )
+
+        result = await tool.execute(patch=patch)
+
+        assert target.read_text() == "lineA\nline2\n"
+        assert "修改" in result
+
+    async def test_apply_patch_create_file(self, tool: ApplyPatchTool, tmp_path: Path) -> None:
+        """测试通过补丁新增文件。"""
+        patch = (
+            "--- /dev/null\n"
+            "+++ b/new.txt\n"
+            "@@ -0,0 +1,2 @@\n"
+            "+hello\n"
+            "+world\n"
+        )
+
+        await tool.execute(patch=patch)
+
+        created = tmp_path / "new.txt"
+        assert created.exists()
+        assert created.read_text() == "hello\nworld\n"
+
+    async def test_apply_patch_delete_file(self, tool: ApplyPatchTool, tmp_path: Path) -> None:
+        """测试通过补丁删除文件。"""
+        target = tmp_path / "remove.txt"
+        target.write_text("gone\n")
+        patch = (
+            "--- a/remove.txt\n"
+            "+++ /dev/null\n"
+            "@@ -1,1 +0,0 @@\n"
+            "-gone\n"
+        )
+
+        await tool.execute(patch=patch)
+
+        assert not target.exists()
+
+    async def test_apply_patch_dry_run(self, tool: ApplyPatchTool, tmp_path: Path) -> None:
+        """测试 dry-run 不会落盘。"""
+        target = tmp_path / "sample.txt"
+        target.write_text("line1\n")
+        patch = (
+            "--- a/sample.txt\n"
+            "+++ b/sample.txt\n"
+            "@@ -1,1 +1,1 @@\n"
+            "-line1\n"
+            "+line2\n"
+        )
+
+        result = await tool.execute(patch=patch, dry_run=True)
+
+        assert target.read_text() == "line1\n"
+        assert result.startswith("[预览]")
 
 
 class TestGlobTool:
