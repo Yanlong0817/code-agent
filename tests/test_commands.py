@@ -200,6 +200,7 @@ class TestToolsCommand:
         command = ToolsCommand(MagicMock())
 
         assert command._get_tool_category("ApplyPatch", command.TOOL_CATEGORIES) == "文件操作"
+        assert command._get_tool_category("Undo", command.TOOL_CATEGORIES) == "文件操作"
         assert command._get_tool_category("Insert", command.TOOL_CATEGORIES) == "文件操作"
         assert command._get_tool_category("ListDirectory", command.TOOL_CATEGORIES) == "文件操作"
         assert command._get_category_order("ApplyPatch")[0] == command.CATEGORY_ORDER["文件操作"]

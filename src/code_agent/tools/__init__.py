@@ -3,12 +3,14 @@
 from code_agent.tools.base import BaseTool, ToolRegistry
 from code_agent.tools.file_ops import (
     ApplyPatchTool,
+    CheckpointStore,
     EditTool,
     GlobTool,
     GrepTool,
     InsertTool,
     ListDirectoryTool,
     ReadTool,
+    UndoTool,
     WriteTool,
 )
 from code_agent.tools.network import WebFetchTool, WebSearchTool
@@ -21,10 +23,12 @@ __all__ = [
     "WriteTool",
     "EditTool",
     "ApplyPatchTool",
+    "UndoTool",
     "InsertTool",
     "ListDirectoryTool",
     "GlobTool",
     "GrepTool",
+    "CheckpointStore",
     "BashTool",
     "WebFetchTool",
     "WebSearchTool",

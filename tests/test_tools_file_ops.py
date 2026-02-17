@@ -6,11 +6,13 @@ import pytest
 
 from code_agent.tools.file_ops import (
     ApplyPatchTool,
+    CheckpointStore,
     EditTool,
     GlobTool,
     GrepTool,
     InsertTool,
     ReadTool,
+    UndoTool,
     WriteTool,
 )
 
@@ -346,6 +348,141 @@ class TestApplyPatchTool:
 
         assert target.read_text() == "line1\n"
         assert result.startswith("[预览]")
+
+
+class TestUndoTool:
+    """UndoTool 测试。"""
+
+    @pytest.fixture
+    def checkpoint_store(self) -> CheckpointStore:
+        return CheckpointStore()
+
+    @pytest.fixture
+    def write_tool(self, tmp_path: Path, checkpoint_store: CheckpointStore) -> WriteTool:
+        return WriteTool(working_directory=tmp_path, checkpoint_store=checkpoint_store)
+
+    @pytest.fixture
+    def edit_tool(self, tmp_path: Path, checkpoint_store: CheckpointStore) -> EditTool:
+        return EditTool(working_directory=tmp_path, checkpoint_store=checkpoint_store)
+
+    @pytest.fixture
+    def insert_tool(self, tmp_path: Path, checkpoint_store: CheckpointStore) -> InsertTool:
+        return InsertTool(working_directory=tmp_path, checkpoint_store=checkpoint_store)
+
+    @pytest.fixture
+    def apply_patch_tool(
+        self, tmp_path: Path, checkpoint_store: CheckpointStore
+    ) -> ApplyPatchTool:
+        return ApplyPatchTool(working_directory=tmp_path, checkpoint_store=checkpoint_store)
+
+    @pytest.fixture
+    def undo_tool(self, tmp_path: Path, checkpoint_store: CheckpointStore) -> UndoTool:
+        return UndoTool(working_directory=tmp_path, checkpoint_store=checkpoint_store)
+
+    async def test_undo_restore_overwritten_file(
+        self, tmp_path: Path, write_tool: WriteTool, undo_tool: UndoTool
+    ) -> None:
+        """测试回滚覆盖写入。"""
+        target = tmp_path / "notes.txt"
+        target.write_text("old")
+
+        await write_tool.execute(str(target), "new")
+        assert target.read_text() == "new"
+
+        result = await undo_tool.execute()
+
+        assert target.read_text() == "old"
+        assert "已回滚 1 个检查点" in result
+
+    async def test_undo_removes_new_file(
+        self, tmp_path: Path, write_tool: WriteTool, undo_tool: UndoTool
+    ) -> None:
+        """测试回滚新建文件。"""
+        target = tmp_path / "new.txt"
+
+        await write_tool.execute(str(target), "hello")
+        assert target.exists()
+
+        await undo_tool.execute()
+        assert not target.exists()
+
+    async def test_undo_with_file_filter(
+        self, tmp_path: Path, write_tool: WriteTool, undo_tool: UndoTool
+    ) -> None:
+        """测试按文件路径过滤回滚。"""
+        file_a = tmp_path / "a.txt"
+        file_b = tmp_path / "b.txt"
+        file_a.write_text("A0")
+        file_b.write_text("B0")
+
+        await write_tool.execute(str(file_a), "A1")
+        await write_tool.execute(str(file_b), "B1")
+
+        result = await undo_tool.execute(file_path=str(file_a))
+
+        assert file_a.read_text() == "A0"
+        assert file_b.read_text() == "B1"
+        assert str(file_a) in result
+
+    async def test_undo_multiple_steps(
+        self, tmp_path: Path, write_tool: WriteTool, undo_tool: UndoTool
+    ) -> None:
+        """测试多步回滚。"""
+        target = tmp_path / "stack.txt"
+        target.write_text("v0")
+
+        await write_tool.execute(str(target), "v1")
+        await write_tool.execute(str(target), "v2")
+        assert target.read_text() == "v2"
+
+        await undo_tool.execute(steps=2)
+
+        assert target.read_text() == "v0"
+
+    async def test_undo_edit_and_insert(
+        self,
+        tmp_path: Path,
+        edit_tool: EditTool,
+        insert_tool: InsertTool,
+        undo_tool: UndoTool,
+    ) -> None:
+        """测试 Edit/Insert 的回滚顺序。"""
+        target = tmp_path / "code.py"
+        target.write_text("line1\nline2\n")
+
+        await edit_tool.execute(str(target), old_string="line2", new_string="lineB")
+        await insert_tool.execute(str(target), insert_line=1, insert_text="lineX")
+        assert target.read_text() == "line1\nlineX\nlineB\n"
+
+        await undo_tool.execute()
+        assert target.read_text() == "line1\nlineB\n"
+
+        await undo_tool.execute()
+        assert target.read_text() == "line1\nline2\n"
+
+    async def test_undo_apply_patch_create_file(
+        self, tmp_path: Path, apply_patch_tool: ApplyPatchTool, undo_tool: UndoTool
+    ) -> None:
+        """测试回滚 ApplyPatch 新建文件。"""
+        patch = (
+            "--- /dev/null\n"
+            "+++ b/from_patch.txt\n"
+            "@@ -0,0 +1,1 @@\n"
+            "+content\n"
+        )
+
+        await apply_patch_tool.execute(patch=patch)
+        target = tmp_path / "from_patch.txt"
+        assert target.exists()
+
+        await undo_tool.execute()
+        assert not target.exists()
+
+    async def test_undo_without_checkpoints(self, undo_tool: UndoTool) -> None:
+        """测试无检查点时回滚。"""
+        result = await undo_tool.execute()
+
+        assert result == "没有可回滚的检查点"
 
 
 class TestGlobTool:

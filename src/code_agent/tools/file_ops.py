@@ -1,4 +1,4 @@
-"""文件操作工具：Read、Write、Edit、ApplyPatch、Insert、Glob、Grep。"""
+"""文件操作工具：Read、Write、Edit、ApplyPatch、Undo、Insert、Glob、Grep。"""
 
 import asyncio
 import re
@@ -39,15 +39,76 @@ class _PatchOperation:
     new_content: str
 
 
+@dataclass
+class FileCheckpoint:
+    """文件变更检查点。"""
+
+    path: Path
+    existed_before: bool
+    content_before: str
+    reason: str
+
+
+class CheckpointStore:
+    """按时间顺序保存文件快照，用于回滚。"""
+
+    def __init__(self, max_entries: int = 500) -> None:
+        self._entries: list[FileCheckpoint] = []
+        self._max_entries = max_entries
+
+    def create(self, path: Path, reason: str) -> None:
+        """记录一个新检查点。"""
+        existed_before = path.exists()
+        if existed_before:
+            if not path.is_file():
+                raise ValueError(f"检查点目标不是文件：{path}")
+            with open(path, encoding="utf-8", errors="replace") as f:
+                content_before = f.read()
+        else:
+            content_before = ""
+
+        self._entries.append(
+            FileCheckpoint(
+                path=path,
+                existed_before=existed_before,
+                content_before=content_before,
+                reason=reason,
+            )
+        )
+        if len(self._entries) > self._max_entries:
+            self._entries.pop(0)
+
+    def pop(self, path: Path | None = None) -> FileCheckpoint | None:
+        """弹出最新检查点，可选按路径过滤。"""
+        if not self._entries:
+            return None
+        if path is None:
+            return self._entries.pop()
+
+        for idx in range(len(self._entries) - 1, -1, -1):
+            if self._entries[idx].path == path:
+                return self._entries.pop(idx)
+        return None
+
+    def size(self) -> int:
+        """当前检查点数量。"""
+        return len(self._entries)
+
+
 class _PathGuardedTool(BaseTool):
     """带工作目录隔离和敏感文件检查的工具基类。"""
 
-    def __init__(self, working_directory: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        working_directory: str | Path | None = None,
+        checkpoint_store: CheckpointStore | None = None,
+    ) -> None:
         self._working_directory = (
             Path(working_directory).expanduser().resolve(strict=False)
             if working_directory is not None
             else None
         )
+        self._checkpoint_store = checkpoint_store or CheckpointStore()
 
     def _resolve_path(self, raw_path: str) -> Path:
         """将输入路径解析为绝对路径，并校验是否在工作目录内。"""
@@ -76,6 +137,10 @@ class _PathGuardedTool(BaseTool):
             check, f"{operation} 文件", str(path)
         ):
             raise PermissionError(f"[已取消] 用户拒绝{operation}敏感文件：{path}")
+
+    def _create_checkpoint(self, path: Path, reason: str) -> None:
+        """记录文件检查点，用于后续回滚。"""
+        self._checkpoint_store.create(path, reason)
 
 
 class ReadTool(_PathGuardedTool):
@@ -172,6 +237,7 @@ class WriteTool(_PathGuardedTool):
         """
         path = self._resolve_path(file_path)
         self._confirm_sensitive_path(path, "写入")
+        self._create_checkpoint(path, "Write")
 
         # 必要时创建父目录
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -262,6 +328,7 @@ class EditTool(_PathGuardedTool):
             )
 
         # 实际写入文件
+        self._create_checkpoint(path, "Edit")
         with open(path, "w", encoding="utf-8") as f:
             f.write(new_content)
 
@@ -377,6 +444,9 @@ class ApplyPatchTool(_PathGuardedTool):
             return self._format_patch_result(operations, dry_run=True)
 
         # 所有补丁都验证通过后再执行，避免半应用状态
+        for op in operations:
+            self._create_checkpoint(op.path, f"ApplyPatch:{op.action}")
+
         for op in operations:
             if op.action == "delete":
                 op.path.unlink()
@@ -547,6 +617,66 @@ class ApplyPatchTool(_PathGuardedTool):
         return "\n".join(lines)
 
 
+class UndoTool(_PathGuardedTool):
+    """回滚最近的文件改动。"""
+
+    name: ClassVar[str] = "Undo"
+    description: ClassVar[str] = (
+        "回滚最近的文件改动检查点。"
+        "支持按文件路径回滚，默认回滚最近一次改动。"
+    )
+
+    class Input(BaseModel):
+        file_path: str | None = Field(
+            default=None,
+            description="可选：仅回滚该文件的最近改动",
+        )
+        steps: int = Field(
+            default=1,
+            gt=0,
+            le=50,
+            description="回滚步数，默认 1",
+        )
+
+    async def execute(self, file_path: str | None = None, steps: int = 1) -> str:  # type: ignore[override]
+        """执行回滚。"""
+        target_path = self._resolve_path(file_path) if file_path else None
+        restored: list[Path] = []
+
+        for _ in range(steps):
+            checkpoint = self._checkpoint_store.pop(path=target_path)
+            if checkpoint is None:
+                break
+
+            self._ensure_within_workspace(checkpoint.path)
+            self._confirm_sensitive_path(checkpoint.path, "回滚")
+
+            if checkpoint.existed_before:
+                checkpoint.path.parent.mkdir(parents=True, exist_ok=True)
+                with open(checkpoint.path, "w", encoding="utf-8") as f:
+                    f.write(checkpoint.content_before)
+            elif checkpoint.path.exists():
+                if not checkpoint.path.is_file():
+                    raise ValueError(f"无法回滚，路径不是文件：{checkpoint.path}")
+                checkpoint.path.unlink()
+
+            restored.append(checkpoint.path)
+
+        if not restored:
+            if target_path is not None:
+                return f"未找到可回滚的检查点：{target_path}"
+            return "没有可回滚的检查点"
+
+        lines = [f"已回滚 {len(restored)} 个检查点："]
+        for path in restored:
+            lines.append(f"- {path}")
+
+        if self._checkpoint_store.size() > 0:
+            lines.append(f"[剩余检查点 {self._checkpoint_store.size()} 个]")
+
+        return "\n".join(lines)
+
+
 class InsertTool(_PathGuardedTool):
     """在指定行后插入文本。"""
 
@@ -613,6 +743,7 @@ class InsertTool(_PathGuardedTool):
 
         new_content = "".join(new_lines)
 
+        self._create_checkpoint(path, "Insert")
         with open(path, "w", encoding="utf-8") as f:
             f.write(new_content)
 

@@ -19,6 +19,7 @@ class ToolsCommand(BaseCommand):
             "Write",
             "Edit",
             "ApplyPatch",
+            "Undo",
             "Insert",
             "ListDirectory",
             "Glob",

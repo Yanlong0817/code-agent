@@ -16,12 +16,14 @@ from code_agent.logging import get_logger
 from code_agent.tools.base import ToolRegistry
 from code_agent.tools.file_ops import (
     ApplyPatchTool,
+    CheckpointStore,
     EditTool,
     GlobTool,
     GrepTool,
     InsertTool,
     ListDirectoryTool,
     ReadTool,
+    UndoTool,
     WriteTool,
 )
 from code_agent.tools.network import WebFetchTool, WebSearchTool
@@ -111,13 +113,25 @@ class CodeAgent:
     def _register_tools(self) -> None:
         """注册所有可用工具。"""
         workspace = self.config.working_directory
+        checkpoint_store = CheckpointStore()
 
         # 文件操作
         self.registry.register(ReadTool(working_directory=workspace))
-        self.registry.register(WriteTool(working_directory=workspace))
-        self.registry.register(EditTool(working_directory=workspace))
-        self.registry.register(ApplyPatchTool(working_directory=workspace))
-        self.registry.register(InsertTool(working_directory=workspace))
+        self.registry.register(
+            WriteTool(working_directory=workspace, checkpoint_store=checkpoint_store)
+        )
+        self.registry.register(
+            EditTool(working_directory=workspace, checkpoint_store=checkpoint_store)
+        )
+        self.registry.register(
+            ApplyPatchTool(working_directory=workspace, checkpoint_store=checkpoint_store)
+        )
+        self.registry.register(
+            UndoTool(working_directory=workspace, checkpoint_store=checkpoint_store)
+        )
+        self.registry.register(
+            InsertTool(working_directory=workspace, checkpoint_store=checkpoint_store)
+        )
         self.registry.register(ListDirectoryTool(working_directory=workspace))
         self.registry.register(GlobTool(working_directory=workspace))
         self.registry.register(GrepTool(working_directory=workspace))
