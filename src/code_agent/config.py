@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 日志级别类型
@@ -20,15 +20,17 @@ class Config(BaseSettings):
     )
 
     # API 密钥
-    anthropic_api_key: str = Field(
+    openai_api_key: str = Field(
         default="",
-        description="Anthropic API 密钥，用于 Claude",
-        alias="ANTHROPIC_API_KEY",
+        description="OpenAI API 密钥",
+        alias="OPENAI_API_KEY",
+        validation_alias=AliasChoices("OPENAI_API_KEY", "ANTHROPIC_API_KEY"),
     )
-    anthropic_base_url: str | None = Field(
+    openai_base_url: str | None = Field(
         default=None,
-        description="Anthropic API 基础 URL（用于代理或自定义端点）",
-        alias="ANTHROPIC_BASE_URL",
+        description="OpenAI API 基础 URL（用于代理或自定义端点）",
+        alias="OPENAI_BASE_URL",
+        validation_alias=AliasChoices("OPENAI_BASE_URL", "ANTHROPIC_BASE_URL"),
     )
     tavily_api_key: str = Field(
         default="",
@@ -38,8 +40,8 @@ class Config(BaseSettings):
 
     # 模型设置
     model: str = Field(
-        default="claude-sonnet-4-20250514",
-        description="使用的 Claude 模型",
+        default="gpt-4.1",
+        description="使用的 OpenAI 模型",
         alias="CODE_AGENT_MODEL",
     )
     max_tokens: int = Field(
@@ -109,10 +111,18 @@ class Config(BaseSettings):
         Raises:
             ValueError: 如果缺少必需的配置
         """
-        if not self.anthropic_api_key:
-            raise ValueError(
-                "需要设置 ANTHROPIC_API_KEY 环境变量。请在环境变量或 .env 文件中设置。"
-            )
+        if not self.openai_api_key:
+            raise ValueError("需要设置 OPENAI_API_KEY 环境变量。请在环境变量或 .env 文件中设置。")
+
+    @property
+    def anthropic_api_key(self) -> str:
+        """兼容旧字段名，映射到 openai_api_key。"""
+        return self.openai_api_key
+
+    @property
+    def anthropic_base_url(self) -> str | None:
+        """兼容旧字段名，映射到 openai_base_url。"""
+        return self.openai_base_url
 
     @classmethod
     def from_env(cls) -> "Config":

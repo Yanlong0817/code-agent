@@ -41,13 +41,13 @@ class TestSessionMetadata:
             id="test_id",
             created_at=now,
             updated_at=now,
-            model="claude-sonnet-4-20250514",
+            model="gpt-4.1",
             message_count=5,
             title="Test Session",
         )
 
         assert metadata.id == "test_id"
-        assert metadata.model == "claude-sonnet-4-20250514"
+        assert metadata.model == "gpt-4.1"
         assert metadata.message_count == 5
         assert metadata.title == "Test Session"
 
@@ -103,11 +103,11 @@ class TestSessionManager:
     def test_create_session(self, session_manager: SessionManager) -> None:
         """测试创建会话。"""
         session = session_manager.create(
-            model="claude-sonnet-4-20250514",
+            model="gpt-4.1",
             title="Test Session",
         )
 
-        assert session.metadata.model == "claude-sonnet-4-20250514"
+        assert session.metadata.model == "gpt-4.1"
         assert session.metadata.title == "Test Session"
         assert session.messages == []
         assert session.metadata.id  # 应该有 ID

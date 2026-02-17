@@ -12,13 +12,11 @@ from code_agent.ui.theme import Theme
 
 # 模型上下文窗口大小（token 数）
 MODEL_CONTEXT_LIMITS: dict[str, int] = {
-    "claude-opus-4-5-20251101": 200000,
-    "claude-sonnet-4-20250514": 200000,
-    "claude-3-opus": 200000,
-    "claude-3-sonnet": 200000,
-    "claude-3-haiku": 200000,
-    "claude-3-5-sonnet": 200000,
-    "default": 200000,
+    "gpt-4.1": 128000,
+    "gpt-4.1-mini": 128000,
+    "gpt-4o": 128000,
+    "gpt-4o-mini": 128000,
+    "default": 128000,
 }
 
 # Token 使用警告阈值
@@ -32,7 +30,7 @@ class TokenUsage:
 
     input_tokens: int = 0
     output_tokens: int = 0
-    context_limit: int = 200000
+    context_limit: int = 128000
     warnings_shown: set[str] = field(default_factory=set)
 
     @property
@@ -203,12 +201,16 @@ class StatusBar:
     def _get_short_model_name(self) -> str:
         """获取简化的模型名称。"""
         model = self.model.lower()
-        if "opus" in model:
-            return "opus"
-        elif "sonnet" in model:
-            return "sonnet"
-        elif "haiku" in model:
-            return "haiku"
+        if "gpt-4.1-mini" in model:
+            return "4.1-mini"
+        elif "gpt-4.1" in model:
+            return "4.1"
+        elif "gpt-4o-mini" in model:
+            return "4o-mini"
+        elif "gpt-4o" in model:
+            return "4o"
+        elif "gpt-5" in model:
+            return "gpt-5"
         else:
             parts = self.model.split("-")
             return parts[1] if len(parts) > 1 else self.model[:10]

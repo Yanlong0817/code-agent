@@ -10,8 +10,8 @@ class BaseTool(ABC):
     """所有工具的抽象基类。
 
     每个工具必须定义：
-    - name: Claude API 的工具名称
-    - description: Claude API 的工具描述
+    - name: 工具名称
+    - description: 工具描述
     - Input: 用于输入验证的 Pydantic 模型
     - execute(): 执行工具的异步方法
     """
@@ -38,14 +38,14 @@ class BaseTool(ABC):
 
     @classmethod
     def get_schema(cls) -> dict[str, Any]:
-        """从 Input 模型生成 Claude API 工具 schema。
+        """从 Input 模型生成工具 schema。
 
         Returns:
-            与 Claude API 兼容的工具 schema 字典
+            工具 schema 字典（由具体模型 API 适配层转换）
         """
         json_schema = cls.Input.model_json_schema()
 
-        # 移除 Claude 不需要的 title 和 definitions
+        # 移除通用适配层不需要的字段
         json_schema.pop("title", None)
         json_schema.pop("$defs", None)
 
@@ -92,7 +92,7 @@ class ToolRegistry:
         return list(self._tools.values())
 
     def get_schemas(self) -> list[dict[str, Any]]:
-        """获取所有已注册工具的 Claude API schema。"""
+        """获取所有已注册工具的 schema。"""
         return [tool.get_schema() for tool in self._tools.values()]
 
     async def execute(self, name: str, **kwargs: Any) -> Any:

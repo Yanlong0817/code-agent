@@ -1,14 +1,14 @@
-"""Code Agent - 集成 Claude API 的主 Agent 循环。"""
+"""Code Agent - 集成 OpenAI API 的主 Agent 循环。"""
 
 from __future__ import annotations
 
 import json
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
 from rich.console import Console
-from rich.live import Live
 from rich.markdown import Markdown
 
 from code_agent.config import Config
@@ -37,8 +37,28 @@ if TYPE_CHECKING:
 logger = get_logger("agent")
 
 
+@dataclass
+class _OpenAIToolCall:
+    """内部统一的工具调用结构。"""
+
+    id: str
+    name: str
+    input: dict[str, Any]
+
+
+@dataclass
+class _ModelResponse:
+    """模型响应的内部表示。"""
+
+    text: str
+    tool_calls: list[_OpenAIToolCall]
+    input_tokens: int
+    output_tokens: int
+    stop_reason: str
+
+
 class CodeAgent:
-    """基于 Claude 的代码 Agent，具备工具调用能力。"""
+    """基于 OpenAI 的代码 Agent，具备工具调用能力。"""
 
     SYSTEM_PROMPT = """你是一个有用的编程助手，可以使用各种工具。
 你可以读取、写入和编辑文件，搜索代码库，执行 shell 命令，
@@ -69,9 +89,9 @@ class CodeAgent:
 
         logger.info("初始化 CodeAgent，模型: %s", self.config.model)
 
-        self.client = AsyncAnthropic(
-            api_key=self.config.anthropic_api_key,
-            base_url=self.config.anthropic_base_url,
+        self.client = AsyncOpenAI(
+            api_key=self.config.openai_api_key,
+            base_url=self.config.openai_base_url,
         )
         self.console = Console()
         self.messages: list[dict[str, Any]] = []
@@ -171,57 +191,50 @@ class CodeAgent:
             if self.config.verbose:
                 self.console.print(f"[dim]迭代 {iteration}[/dim]")
 
-            # 调用 Claude API（流式）
-            logger.debug("调用 Claude API（流式）")
-            response, text_content = await self._call_api_stream()
+            # 调用 OpenAI API
+            logger.debug("调用 OpenAI API")
+            response = await self._call_api_stream()
             logger.debug("API 响应停止原因: %s", response.stop_reason)
 
             # 更新 token 使用量
-            current_input_tokens = 0
-            if hasattr(response, "usage"):
-                current_input_tokens = response.usage.input_tokens
-                self._last_input_tokens = current_input_tokens
-                self.status_bar.update_tokens(
-                    response.usage.input_tokens,
-                    response.usage.output_tokens,
+            current_input_tokens = response.input_tokens
+            self._last_input_tokens = current_input_tokens
+            self.status_bar.update_tokens(
+                response.input_tokens,
+                response.output_tokens,
+            )
+
+            if response.text:
+                final_response = response.text
+
+            # 从响应中提取文本和工具调用，保持内部消息格式不变
+            assistant_content: list[dict[str, Any]] = []
+            if response.text:
+                assistant_content.append({"type": "text", "text": response.text})
+
+            for tool_call in response.tool_calls:
+                assistant_content.append(
+                    {
+                        "type": "tool_use",
+                        "id": tool_call.id,
+                        "name": tool_call.name,
+                        "input": tool_call.input,
+                    }
                 )
 
-            if text_content:
-                final_response = text_content
+            if assistant_content:
+                self.messages.append({"role": "assistant", "content": assistant_content})
 
-            # 从响应中提取工具调用
-            assistant_content = []
-            tool_calls = []
-
-            for block in response.content:
-                if block.type == "text":
-                    assistant_content.append({"type": "text", "text": block.text})
-                elif block.type == "tool_use":
-                    tool_calls.append(block)
-                    assistant_content.append(
-                        {
-                            "type": "tool_use",
-                            "id": block.id,
-                            "name": block.name,
-                            "input": block.input,
-                        }
-                    )
-
-            # 将助手消息添加到历史记录
-            self.messages.append({"role": "assistant", "content": assistant_content})
-
-            # 检查停止原因
-            if response.stop_reason == "end_turn":
+            # 无工具调用则本轮结束
+            if not response.tool_calls:
                 await self._maybe_compact_context(current_input_tokens, reason="post_turn")
                 logger.info("Agent 完成处理，共 %d 次迭代", iteration)
-                # 显示状态栏
                 self.console.print(self.status_bar.render_simple())
                 break
 
             # 执行工具调用
-            if tool_calls:
-                tool_results = await self._execute_tool_calls(tool_calls)
-                self.messages.append({"role": "user", "content": tool_results})
+            tool_results = await self._execute_tool_calls(response.tool_calls)
+            self.messages.append({"role": "user", "content": tool_results})
 
         return final_response
 
@@ -271,19 +284,21 @@ class CodeAgent:
         if not historical_messages:
             return
 
-        summary_response = await self.client.messages.create(
+        summary_messages = historical_messages + [
+            {"role": "user", "content": self.COMPACTION_PROMPT}
+        ]
+        summary_response = await self.client.chat.completions.create(
             model=self.config.model,
             max_tokens=self.config.auto_compact_summary_max_tokens,
-            messages=cast(
-                Any,
-                historical_messages + [{"role": "user", "content": self.COMPACTION_PROMPT}],
-            ),
+            messages=cast(Any, self._to_openai_messages(summary_messages)),
         )
 
-        summary_parts = [
-            block.text for block in summary_response.content if getattr(block, "type", "") == "text"
-        ]
-        summary_text = "\n".join(part.strip() for part in summary_parts if part.strip()).strip()
+        summary_text = (
+            (summary_response.choices[0].message.content or "")
+            if getattr(summary_response, "choices", None)
+            else ""
+        )
+        summary_text = summary_text.strip()
         if not summary_text:
             raise ValueError("未能生成可用的上下文摘要")
 
@@ -306,36 +321,165 @@ class CodeAgent:
         )
         self.console.print(compact_msg)
 
-    async def _call_api_stream(self) -> tuple[Any, str]:
-        """使用流式 API 调用 Claude，实时渲染 Markdown 输出。
-
-        Returns:
-            (最终消息对象, 累积的文本内容)
-        """
-        accumulated_text = ""
-
-        async with self.client.messages.stream(
+    async def _call_api_stream(self) -> _ModelResponse:
+        """调用 OpenAI Chat Completions API。"""
+        response = await self.client.chat.completions.create(
             model=self.config.model,
             max_tokens=self.config.max_tokens,
-            system=self.SYSTEM_PROMPT,
-            tools=cast(Any, self.registry.get_schemas()),
-            messages=cast(Any, self.messages),
-        ) as stream:
-            # 使用 Rich Live 实时渲染 Markdown
-            with Live(Markdown(""), console=self.console, refresh_per_second=10) as live:
-                async for text in stream.text_stream:
-                    # 清理可能的无效字符
-                    clean_text = self._clean_text(text)
-                    accumulated_text += clean_text
-                    # 实时更新 Markdown 渲染
-                    live.update(Markdown(accumulated_text))
+            messages=cast(Any, self._to_openai_messages(self.messages)),
+            tools=cast(Any, self._to_openai_tools()),
+            tool_choice="auto",
+        )
 
-            # 获取最终消息
-            response = await stream.get_final_message()
+        choice = response.choices[0]
+        message = choice.message
 
-        return response, accumulated_text
+        raw_text = message.content or ""
+        accumulated_text = self._clean_text(raw_text)
+        if accumulated_text:
+            self.console.print(Markdown(accumulated_text))
 
-    async def _execute_tool_calls(self, tool_calls: list[Any]) -> list[dict[str, Any]]:
+        parsed_tool_calls: list[_OpenAIToolCall] = []
+        for index, tool_call in enumerate(message.tool_calls or []):
+            tool_name = tool_call.function.name or ""
+            if not tool_name:
+                continue
+
+            raw_arguments = tool_call.function.arguments or "{}"
+            try:
+                parsed_arguments = json.loads(raw_arguments) if raw_arguments else {}
+            except json.JSONDecodeError:
+                logger.warning("工具参数不是合法 JSON，将作为原始字符串传递: %s", raw_arguments)
+                parsed_arguments = {"_raw_arguments": raw_arguments}
+
+            if not isinstance(parsed_arguments, dict):
+                parsed_arguments = {"_value": parsed_arguments}
+
+            parsed_tool_calls.append(
+                _OpenAIToolCall(
+                    id=tool_call.id or f"tool_call_{index + 1}",
+                    name=tool_name,
+                    input=parsed_arguments,
+                )
+            )
+
+        usage = getattr(response, "usage", None)
+        input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        stop_reason = choice.finish_reason or "stop"
+
+        return _ModelResponse(
+            text=accumulated_text,
+            tool_calls=parsed_tool_calls,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            stop_reason=stop_reason,
+        )
+
+    def _to_openai_tools(self) -> list[dict[str, Any]]:
+        """将内部工具 schema 转换为 OpenAI tools 格式。"""
+        openai_tools: list[dict[str, Any]] = []
+        for schema in self.registry.get_schemas():
+            openai_tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": schema["name"],
+                        "description": schema["description"],
+                        "parameters": schema.get("input_schema", {}),
+                    },
+                }
+            )
+        return openai_tools
+
+    def _to_openai_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """将内部消息格式转换为 OpenAI Chat Completions messages。"""
+        openai_messages: list[dict[str, Any]] = [{"role": "system", "content": self.SYSTEM_PROMPT}]
+
+        for message in messages:
+            role = message.get("role")
+            content = message.get("content")
+
+            if role == "user":
+                if isinstance(content, str):
+                    openai_messages.append({"role": "user", "content": content})
+                    continue
+
+                # user + tool_result（内部格式） -> OpenAI tool 消息
+                if isinstance(content, list):
+                    for item in content:
+                        if not isinstance(item, dict) or item.get("type") != "tool_result":
+                            continue
+                        tool_call_id = item.get("tool_use_id")
+                        if not isinstance(tool_call_id, str) or not tool_call_id:
+                            continue
+                        tool_content = item.get("content", "")
+                        if not isinstance(tool_content, str):
+                            try:
+                                tool_content = json.dumps(tool_content, ensure_ascii=False)
+                            except (TypeError, ValueError):
+                                tool_content = str(tool_content)
+                        openai_messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "content": tool_content,
+                            }
+                        )
+                continue
+
+            if role == "assistant":
+                if isinstance(content, str):
+                    openai_messages.append({"role": "assistant", "content": content})
+                    continue
+
+                if isinstance(content, list):
+                    text_parts: list[str] = []
+                    tool_calls: list[dict[str, Any]] = []
+                    for item in content:
+                        if not isinstance(item, dict):
+                            continue
+                        item_type = item.get("type")
+                        if item_type == "text":
+                            text = item.get("text")
+                            if isinstance(text, str) and text:
+                                text_parts.append(text)
+                        elif item_type == "tool_use":
+                            tool_name = item.get("name")
+                            tool_id = item.get("id")
+                            tool_input = item.get("input", {})
+                            if (
+                                not isinstance(tool_name, str)
+                                or not tool_name
+                                or not isinstance(tool_id, str)
+                                or not tool_id
+                            ):
+                                continue
+                            if not isinstance(tool_input, dict):
+                                tool_input = {}
+                            tool_calls.append(
+                                {
+                                    "id": tool_id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool_name,
+                                        "arguments": json.dumps(tool_input, ensure_ascii=False),
+                                    },
+                                }
+                            )
+
+                    if text_parts or tool_calls:
+                        assistant_message: dict[str, Any] = {
+                            "role": "assistant",
+                            "content": "\n".join(text_parts) if text_parts else "",
+                        }
+                        if tool_calls:
+                            assistant_message["tool_calls"] = tool_calls
+                        openai_messages.append(assistant_message)
+
+        return openai_messages
+
+    async def _execute_tool_calls(self, tool_calls: list[_OpenAIToolCall]) -> list[dict[str, Any]]:
         """执行工具调用并返回结果。
 
         Args:

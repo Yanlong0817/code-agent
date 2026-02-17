@@ -175,9 +175,7 @@ class TestEditTool:
         with pytest.raises(FileNotFoundError):
             await tool.execute(str(tmp_path / "nope.txt"), old_string="a", new_string="b")
 
-    async def test_replace_not_found_shows_context(
-        self, tool: EditTool, sample_file: Path
-    ) -> None:
+    async def test_replace_not_found_shows_context(self, tool: EditTool, sample_file: Path) -> None:
         """测试字符串未找到时显示相似上下文。"""
         try:
             await tool.execute(str(sample_file), old_string="def Hello", new_string="x")
@@ -203,9 +201,7 @@ class TestInsertTool:
 
     async def test_insert_at_beginning(self, tool: InsertTool, sample_file: Path) -> None:
         """测试在文件开头插入。"""
-        result = await tool.execute(
-            str(sample_file), insert_line=0, insert_text="import os"
-        )
+        result = await tool.execute(str(sample_file), insert_line=0, insert_text="import os")
 
         content = sample_file.read_text()
         assert content.startswith("import os\n")
@@ -215,9 +211,7 @@ class TestInsertTool:
 
     async def test_insert_after_line(self, tool: InsertTool, sample_file: Path) -> None:
         """测试在指定行后插入。"""
-        result = await tool.execute(
-            str(sample_file), insert_line=2, insert_text="inserted line"
-        )
+        result = await tool.execute(str(sample_file), insert_line=2, insert_text="inserted line")
 
         content = sample_file.read_text()
         lines = content.splitlines()
@@ -229,9 +223,7 @@ class TestInsertTool:
 
     async def test_insert_at_end(self, tool: InsertTool, sample_file: Path) -> None:
         """测试在文件末尾插入。"""
-        await tool.execute(
-            str(sample_file), insert_line=3, insert_text="line 4"
-        )
+        await tool.execute(str(sample_file), insert_line=3, insert_text="line 4")
 
         content = sample_file.read_text()
         assert "line 4" in content
@@ -257,9 +249,7 @@ class TestInsertTool:
     async def test_insert_nonexistent_file(self, tool: InsertTool, tmp_path: Path) -> None:
         """测试插入到不存在的文件。"""
         with pytest.raises(FileNotFoundError):
-            await tool.execute(
-                str(tmp_path / "nope.txt"), insert_line=0, insert_text="x"
-            )
+            await tool.execute(str(tmp_path / "nope.txt"), insert_line=0, insert_text="x")
 
     async def test_insert_multiline(self, tool: InsertTool, sample_file: Path) -> None:
         """测试插入多行文本。"""
@@ -287,14 +277,7 @@ class TestApplyPatchTool:
         """测试修改已有文件。"""
         target = tmp_path / "sample.txt"
         target.write_text("line1\nline2\n")
-        patch = (
-            "--- a/sample.txt\n"
-            "+++ b/sample.txt\n"
-            "@@ -1,2 +1,2 @@\n"
-            "-line1\n"
-            "+lineA\n"
-            " line2\n"
-        )
+        patch = "--- a/sample.txt\n+++ b/sample.txt\n@@ -1,2 +1,2 @@\n-line1\n+lineA\n line2\n"
 
         result = await tool.execute(patch=patch)
 
@@ -303,13 +286,7 @@ class TestApplyPatchTool:
 
     async def test_apply_patch_create_file(self, tool: ApplyPatchTool, tmp_path: Path) -> None:
         """测试通过补丁新增文件。"""
-        patch = (
-            "--- /dev/null\n"
-            "+++ b/new.txt\n"
-            "@@ -0,0 +1,2 @@\n"
-            "+hello\n"
-            "+world\n"
-        )
+        patch = "--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1,2 @@\n+hello\n+world\n"
 
         await tool.execute(patch=patch)
 
@@ -321,12 +298,7 @@ class TestApplyPatchTool:
         """测试通过补丁删除文件。"""
         target = tmp_path / "remove.txt"
         target.write_text("gone\n")
-        patch = (
-            "--- a/remove.txt\n"
-            "+++ /dev/null\n"
-            "@@ -1,1 +0,0 @@\n"
-            "-gone\n"
-        )
+        patch = "--- a/remove.txt\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-gone\n"
 
         await tool.execute(patch=patch)
 
@@ -336,13 +308,7 @@ class TestApplyPatchTool:
         """测试 dry-run 不会落盘。"""
         target = tmp_path / "sample.txt"
         target.write_text("line1\n")
-        patch = (
-            "--- a/sample.txt\n"
-            "+++ b/sample.txt\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-line1\n"
-            "+line2\n"
-        )
+        patch = "--- a/sample.txt\n+++ b/sample.txt\n@@ -1,1 +1,1 @@\n-line1\n+line2\n"
 
         result = await tool.execute(patch=patch, dry_run=True)
 
@@ -370,9 +336,7 @@ class TestUndoTool:
         return InsertTool(working_directory=tmp_path, checkpoint_store=checkpoint_store)
 
     @pytest.fixture
-    def apply_patch_tool(
-        self, tmp_path: Path, checkpoint_store: CheckpointStore
-    ) -> ApplyPatchTool:
+    def apply_patch_tool(self, tmp_path: Path, checkpoint_store: CheckpointStore) -> ApplyPatchTool:
         return ApplyPatchTool(working_directory=tmp_path, checkpoint_store=checkpoint_store)
 
     @pytest.fixture
@@ -464,12 +428,7 @@ class TestUndoTool:
         self, tmp_path: Path, apply_patch_tool: ApplyPatchTool, undo_tool: UndoTool
     ) -> None:
         """测试回滚 ApplyPatch 新建文件。"""
-        patch = (
-            "--- /dev/null\n"
-            "+++ b/from_patch.txt\n"
-            "@@ -0,0 +1,1 @@\n"
-            "+content\n"
-        )
+        patch = "--- /dev/null\n+++ b/from_patch.txt\n@@ -0,0 +1,1 @@\n+content\n"
 
         await apply_patch_tool.execute(patch=patch)
         target = tmp_path / "from_patch.txt"

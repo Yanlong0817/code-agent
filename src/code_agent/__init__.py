@@ -1,4 +1,4 @@
-"""Code Agent - 基于 Claude 的智能代码助手。"""
+"""Code Agent - 基于 OpenAI 的智能代码助手。"""
 
 __version__ = "0.1.0"
 

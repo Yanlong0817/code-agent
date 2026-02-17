@@ -10,16 +10,16 @@ from code_agent.commands.base import BaseCommand
 
 # 可用的模型列表
 AVAILABLE_MODELS = [
-    ("claude-sonnet-4-20250514", "Claude Sonnet 4 - 平衡性能与成本"),
-    ("claude-opus-4-5-20251101", "Claude Opus 4.5 - 最强大的模型"),
+    ("gpt-4.1", "GPT-4.1 - 高质量通用模型"),
+    ("gpt-4.1-mini", "GPT-4.1 Mini - 更快更省成本"),
 ]
 
 
 class ModelCommand(BaseCommand):
-    """切换 Claude 模型的命令。"""
+    """切换 OpenAI 模型的命令。"""
 
     name: ClassVar[str] = "model"
-    description: ClassVar[str] = "切换 Claude 模型"
+    description: ClassVar[str] = "切换 OpenAI 模型"
 
     async def execute(self, args: str) -> None:
         """执行模型切换。

@@ -85,13 +85,18 @@ def _get_short_model_name(model: str) -> str:
     Returns:
         简化的模型名称
     """
-    # 处理常见的模型名称格式
-    if "opus" in model.lower():
-        return "Claude Opus"
-    elif "sonnet" in model.lower():
-        return "Claude Sonnet"
-    elif "haiku" in model.lower():
-        return "Claude Haiku"
+    # 处理常见的 OpenAI 模型名称格式
+    model_lower = model.lower()
+    if "gpt-4.1-mini" in model_lower:
+        return "GPT-4.1 Mini"
+    elif "gpt-4.1" in model_lower:
+        return "GPT-4.1"
+    elif "gpt-4o-mini" in model_lower:
+        return "GPT-4o Mini"
+    elif "gpt-4o" in model_lower:
+        return "GPT-4o"
+    elif "gpt-5" in model_lower:
+        return "GPT-5"
     else:
         # 返回前两部分
         parts = model.split("-")

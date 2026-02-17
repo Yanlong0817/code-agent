@@ -38,7 +38,7 @@ def test_auto_save_skips_when_no_messages(tmp_path, monkeypatch: pytest.MonkeyPa
     agent = SimpleNamespace(
         messages=[],
         _current_session=None,
-        config=SimpleNamespace(model="claude-sonnet-4-20250514"),
+        config=SimpleNamespace(model="gpt-4.1"),
     )
     console = MagicMock()
 
@@ -54,7 +54,7 @@ def test_auto_save_creates_new_session(tmp_path, monkeypatch: pytest.MonkeyPatch
     agent = SimpleNamespace(
         messages=[{"role": "user", "content": "帮我看一下这个项目"}],
         _current_session=None,
-        config=SimpleNamespace(model="claude-sonnet-4-20250514"),
+        config=SimpleNamespace(model="gpt-4.1"),
     )
     console = MagicMock()
 
@@ -71,12 +71,12 @@ def test_auto_save_creates_new_session(tmp_path, monkeypatch: pytest.MonkeyPatch
 def test_auto_save_updates_existing_session(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """测试自动保存会更新已有会话。"""
     manager = _patch_session_manager(monkeypatch, tmp_path)
-    session = manager.create(model="claude-sonnet-4-20250514", title="")
+    session = manager.create(model="gpt-4.1", title="")
 
     agent = SimpleNamespace(
         messages=[{"role": "user", "content": "更新会话内容"}],
         _current_session=session,
-        config=SimpleNamespace(model="claude-sonnet-4-20250514"),
+        config=SimpleNamespace(model="gpt-4.1"),
     )
     console = MagicMock()
 
@@ -100,7 +100,7 @@ def test_main_converts_log_file_to_path(tmp_path, monkeypatch: pytest.MonkeyPatc
             return user_input
 
     fake_config = SimpleNamespace(
-        model="claude-sonnet-4-20250514",
+        model="gpt-4.1",
         max_tokens=4096,
         max_iterations=50,
         verbose=False,

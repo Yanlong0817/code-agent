@@ -24,13 +24,13 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog="code-agent",
-        description="基于 Claude 的智能代码助手",
+        description="基于 OpenAI 的智能代码助手",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
   code-agent                          # 交互模式
   code-agent "读取 README.md"          # 单次执行
-  code-agent -m claude-opus-4-5-20251101 "你好"    # 指定模型
+  code-agent -m gpt-4.1 "你好"         # 指定模型
   code-agent --load 20240101_120000   # 加载会话
   code-agent --continue               # 继续上次会话
         """,

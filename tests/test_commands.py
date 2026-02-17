@@ -89,7 +89,7 @@ class TestCommandHandler:
         agent = MagicMock()
         agent.console = MagicMock()
         agent.config = MagicMock()
-        agent.config.model = "claude-sonnet-4-20250514"
+        agent.config.model = "gpt-4.1"
         return agent
 
     @pytest.fixture
@@ -141,7 +141,7 @@ class TestModelCommand:
         agent = MagicMock()
         agent.console = MagicMock()
         agent.config = MagicMock()
-        agent.config.model = "claude-sonnet-4-20250514"
+        agent.config.model = "gpt-4.1"
         agent.status_bar = MagicMock()
         return agent
 
@@ -153,10 +153,10 @@ class TestModelCommand:
         self, command: ModelCommand, mock_agent: MagicMock
     ) -> None:
         """测试直接指定有效模型。"""
-        await command.execute("claude-opus-4-5-20251101")
+        await command.execute("gpt-4.1-mini")
 
-        assert mock_agent.config.model == "claude-opus-4-5-20251101"
-        mock_agent.status_bar.update_model.assert_called_once_with("claude-opus-4-5-20251101")
+        assert mock_agent.config.model == "gpt-4.1-mini"
+        mock_agent.status_bar.update_model.assert_called_once_with("gpt-4.1-mini")
 
     async def test_execute_with_invalid_model(
         self, command: ModelCommand, mock_agent: MagicMock
@@ -173,9 +173,9 @@ class TestModelCommand:
 
     async def test_execute_same_model(self, command: ModelCommand, mock_agent: MagicMock) -> None:
         """测试切换到相同模型。"""
-        mock_agent.config.model = "claude-sonnet-4-20250514"
+        mock_agent.config.model = "gpt-4.1"
 
-        await command.execute("claude-sonnet-4-20250514")
+        await command.execute("gpt-4.1")
 
         # 应该显示未变更消息
         calls = mock_agent.console.print.call_args_list

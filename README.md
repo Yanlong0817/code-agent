@@ -1,6 +1,6 @@
 # Code Agent
 
-一个基于 Claude API 的智能代码助手，采用插件化工具架构，支持文件操作、系统交互、网络工具和会话管理。
+一个基于 OpenAI API 的智能代码助手，采用插件化工具架构，支持文件操作、系统交互、网络工具和会话管理。
 
 ## ✨ 核心特性
 
@@ -8,7 +8,7 @@
 - 💬 **交互式命令** - 9 个内置命令，支持会话管理
 - 🔒 **安全检查** - 危险操作自动检测和确认
 - 📝 **会话管理** - 保存/加载对话历史
-- 🎨 **流式输出** - 实时 Markdown 渲染
+- 🎨 **Markdown 输出** - 终端友好的渲染展示
 - 🚀 **智能输入** - 命令补全、历史记录
 
 ## 🛠️ 工具列表
@@ -38,7 +38,7 @@
 |------|------|
 | `/help` | 显示所有可用命令 |
 | `/clear` | 清除对话历史 |
-| `/model` | 切换 Claude 模型 |
+| `/model` | 切换 OpenAI 模型 |
 | `/tools` | 列出所有可用工具 |
 | `/save [title]` | 保存当前会话 |
 | `/load <id>` | 加载历史会话 |
@@ -73,14 +73,14 @@ uv pip install -e ".[dev]"
 
 ```bash
 # 必需
-ANTHROPIC_API_KEY=your_anthropic_api_key
+OPENAI_API_KEY=your_openai_api_key
 
 # 可选 - API 设置
-ANTHROPIC_BASE_URL=https://api.anthropic.com  # API 基础 URL（用于代理）
+OPENAI_BASE_URL=https://api.openai.com/v1      # API 基础 URL（用于代理）
 TAVILY_API_KEY=your_tavily_api_key            # WebSearch 功能需要
 
 # 可选 - 模型设置
-CODE_AGENT_MODEL=claude-sonnet-4-20250514     # 默认模型
+CODE_AGENT_MODEL=gpt-4.1                       # 默认模型
 CODE_AGENT_MAX_TOKENS=4096                    # 最大响应 token
 CODE_AGENT_MAX_ITERATIONS=50                  # 最大迭代次数
 
@@ -99,10 +99,10 @@ CODE_AGENT_LOG_FILE=~/.code_agent/logs/code_agent.log  # 日志文件路径
 
 ### 可用模型
 
-- `claude-opus-4-6` - 最强大的模型
-- `claude-opus-4-5-20251101` - Opus 4.5
-- `claude-sonnet-4-20250514` - 默认，平衡性能和成本
-- `claude-haiku-4-5-20251001` - 最快速的模型
+- `gpt-4.1` - 高质量通用模型
+- `gpt-4.1-mini` - 更快更省成本
+- `gpt-4o` - 多模态通用模型
+- `gpt-4o-mini` - 轻量多模态模型
 
 ## 🚀 快速开始
 
@@ -113,7 +113,7 @@ CODE_AGENT_LOG_FILE=~/.code_agent/logs/code_agent.log  # 日志文件路径
 code-agent "读取 README.md 文件内容"
 
 # 指定模型
-code-agent -m claude-opus-4-6 "重构这个函数"
+code-agent -m gpt-4.1 "重构这个函数"
 
 # 指定工作目录
 code-agent -w /path/to/project "分析代码结构"
@@ -228,7 +228,7 @@ Grep(pattern="error", case_insensitive=True)
 code_agent/
 ├── pyproject.toml              # 项目配置和依赖
 ├── README.md                   # 项目文档
-├── CLAUDE.md                   # Claude Code 开发指南
+├── CLAUDE.md                   # 开发指南
 ├── src/code_agent/
 │   ├── __init__.py             # 包入口
 │   ├── __main__.py             # CLI 入口
@@ -323,7 +323,7 @@ def _register_tools(self) -> None:
 - 使用 `ClassVar` 定义 `name` 和 `description`
 - 使用 Pydantic `BaseModel` 定义输入参数
 - `execute()` 方法必须是 `async def`
-- 返回字符串结果（会传递给 Claude）
+- 返回字符串结果（会传递给模型）
 
 ## 🧪 开发
 
@@ -369,7 +369,7 @@ ruff format src/
 
 1. **Agent 主循环** (`agent.py`)
    - 异步迭代循环
-   - 流式 API 调用
+   - API 调用与工具编排
    - 工具调用执行
    - 消息历史管理
 
@@ -414,7 +414,7 @@ ruff format src/
 
 | 组件 | 技术 | 说明 |
 |------|------|------|
-| LLM 交互 | Anthropic SDK | Claude API 客户端 |
+| LLM 交互 | OpenAI SDK | OpenAI API 客户端 |
 | 数据验证 | Pydantic v2 | 配置和输入验证 |
 | HTTP 客户端 | httpx | 异步 HTTP 请求 |
 | 网络搜索 | Tavily API | 网络搜索功能 |
@@ -428,7 +428,7 @@ ruff format src/
 ## 📖 相关文档
 
 - [CLAUDE.md](CLAUDE.md) - 完整的开发指南和架构文档
-- [API 文档](https://docs.anthropic.com/) - Claude API 官方文档
+- [API 文档](https://platform.openai.com/docs/overview) - OpenAI API 官方文档
 - [Rich 文档](https://rich.readthedocs.io/) - 终端 UI 库文档
 - [Pydantic 文档](https://docs.pydantic.dev/) - 数据验证库文档
 
@@ -463,7 +463,7 @@ ruff format src/
 
 **重构**：
 - 🔧 移除 TodoWriteTool 任务管理功能
-- 🔧 移除 AskUserQuestionTool（Claude 可直接提问）
+- 🔧 移除 AskUserQuestionTool（模型可直接提问）
 - 🔧 移除 GitTool（使用 Bash 替代）
 
 **修复**：
@@ -476,7 +476,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 🙏 致谢
 
-- [Anthropic](https://www.anthropic.com/) - Claude API
+- [OpenAI](https://platform.openai.com/) - OpenAI API
 - [Rich](https://github.com/Textualize/rich) - 终端 UI
 - [Pydantic](https://github.com/pydantic/pydantic) - 数据验证
 - [ripgrep](https://github.com/BurntSushi/ripgrep) - 代码搜索
