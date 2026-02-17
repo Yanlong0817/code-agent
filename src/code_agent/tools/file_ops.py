@@ -622,8 +622,7 @@ class UndoTool(_PathGuardedTool):
 
     name: ClassVar[str] = "Undo"
     description: ClassVar[str] = (
-        "回滚最近的文件改动检查点。"
-        "支持按文件路径回滚，默认回滚最近一次改动。"
+        "回滚最近的文件改动检查点。支持按文件路径回滚，默认回滚最近一次改动。"
     )
 
     class Input(BaseModel):
