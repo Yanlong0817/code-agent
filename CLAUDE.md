@@ -149,6 +149,7 @@ class BaseTool(ABC):
 - `/clear` - 清除对话历史
 - `/model` - 切换模型
 - `/tools` - 列出可用工具
+- `/commands [list|reload|init]` - 管理自定义命令
 - `/save [title]` - 保存当前会话
 - `/load <id>` - 加载会话
 - `/sessions` - 列出所有会话

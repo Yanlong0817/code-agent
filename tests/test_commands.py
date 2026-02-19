@@ -1,7 +1,8 @@
 """命令模块测试。"""
 
+from pathlib import Path
 from typing import ClassVar
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -90,6 +91,8 @@ class TestCommandHandler:
         agent.console = MagicMock()
         agent.config = MagicMock()
         agent.config.model = "gpt-4.1"
+        agent.config.working_directory = Path.cwd()
+        agent.run = AsyncMock(return_value="ok")
         return agent
 
     @pytest.fixture
@@ -130,6 +133,192 @@ class TestCommandHandler:
         """测试执行非命令输入。"""
         result = await handler.execute("hello world")
         assert result is False
+
+    async def test_execute_custom_command_from_toml(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试从 TOML 加载并执行自定义命令。"""
+        command_file = tmp_path / "commands.toml"
+        command_file.write_text(
+            """
+[commands.explain]
+description = "解释指定内容"
+prompt = "请解释：{args}"
+requires_args = true
+            """.strip(),
+            encoding="utf-8",
+        )
+
+        handler = CommandHandler(mock_agent, custom_command_paths=[command_file])
+        completions = handler.get_completions("/exp")
+        assert "/explain" in completions
+
+        await handler.execute("/explain Python MRO")
+        mock_agent.run.assert_awaited_once_with("请解释：Python MRO")
+
+    async def test_custom_command_requires_args(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试 requires_args 在无参数时阻止执行。"""
+        command_file = tmp_path / "commands.toml"
+        command_file.write_text(
+            """
+[commands.fix]
+description = "修复问题"
+prompt = "请修复：{args}"
+requires_args = true
+            """.strip(),
+            encoding="utf-8",
+        )
+
+        handler = CommandHandler(mock_agent, custom_command_paths=[command_file])
+        await handler.execute("/fix")
+
+        mock_agent.run.assert_not_called()
+        mock_agent.console.print.assert_called()
+
+    async def test_project_command_overrides_global(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试项目级配置可覆盖同名全局命令。"""
+        global_file = tmp_path / "global.toml"
+        project_file = tmp_path / "project.toml"
+
+        global_file.write_text(
+            """
+[commands.review]
+description = "全局审查"
+prompt = "GLOBAL {args}"
+            """.strip(),
+            encoding="utf-8",
+        )
+        project_file.write_text(
+            """
+[commands.review]
+description = "项目审查"
+prompt = "PROJECT {args}"
+            """.strip(),
+            encoding="utf-8",
+        )
+
+        handler = CommandHandler(mock_agent, custom_command_paths=[global_file, project_file])
+        await handler.execute("/review diff")
+
+        mock_agent.run.assert_awaited_once_with("PROJECT diff")
+
+    async def test_commands_reload_refreshes_custom_commands(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试 /commands reload 会刷新自定义命令集合。"""
+        command_file = tmp_path / "commands.toml"
+        command_file.write_text(
+            """
+[commands.one]
+description = "第一条命令"
+prompt = "ONE"
+            """.strip(),
+            encoding="utf-8",
+        )
+        handler = CommandHandler(mock_agent, custom_command_paths=[command_file])
+        assert "/one" in handler.get_completions("/o")
+
+        command_file.write_text(
+            """
+[commands.two]
+description = "第二条命令"
+prompt = "TWO"
+            """.strip(),
+            encoding="utf-8",
+        )
+
+        await handler.execute("/commands reload")
+        assert "/one" not in handler.get_completions("/o")
+        assert "/two" in handler.get_completions("/t")
+
+    async def test_commands_init_creates_project_template(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试 /commands init 默认创建项目级模板。"""
+        global_file = tmp_path / "global.toml"
+        project_file = tmp_path / ".code_agent" / "commands.toml"
+
+        handler = CommandHandler(
+            mock_agent,
+            custom_command_paths=[global_file, project_file],
+        )
+
+        await handler.execute("/commands init")
+        assert project_file.exists()
+        content = project_file.read_text(encoding="utf-8")
+        assert "[commands.review]" in content
+        assert "/review" in handler.get_completions("/r")
+
+    async def test_commands_init_force_overwrites(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试 /commands init --force 会覆盖已有模板文件。"""
+        global_file = tmp_path / "global.toml"
+        project_file = tmp_path / ".code_agent" / "commands.toml"
+        project_file.parent.mkdir(parents=True, exist_ok=True)
+        project_file.write_text(
+            """
+[commands.keep]
+description = "保留"
+prompt = "KEEP"
+            """.strip(),
+            encoding="utf-8",
+        )
+
+        handler = CommandHandler(
+            mock_agent,
+            custom_command_paths=[global_file, project_file],
+        )
+
+        await handler.execute("/commands init")
+        assert "/keep" in handler.get_completions("/k")
+
+        await handler.execute("/commands init --force")
+        assert "/keep" not in handler.get_completions("/k")
+        assert "/review" in handler.get_completions("/r")
+
+    def test_custom_command_unknown_field_reports_warning(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试未知字段会提示告警，但命令仍可加载。"""
+        command_file = tmp_path / "commands.toml"
+        command_file.write_text(
+            """
+[commands.review]
+description = "审查"
+prompt = "REVIEW"
+extra = "unexpected"
+            """.strip(),
+            encoding="utf-8",
+        )
+
+        handler = CommandHandler(mock_agent, custom_command_paths=[command_file])
+        assert "/review" in handler.get_completions("/r")
+        errors = handler.get_custom_command_errors()
+        assert any("未知字段" in message for message in errors)
+
+    def test_custom_command_invalid_placeholder_is_rejected(
+        self, tmp_path: Path, mock_agent: MagicMock
+    ) -> None:
+        """测试非法占位符会阻止命令加载。"""
+        command_file = tmp_path / "commands.toml"
+        command_file.write_text(
+            """
+[commands.bad]
+description = "错误模板"
+prompt = "topic={topic}"
+            """.strip(),
+            encoding="utf-8",
+        )
+
+        handler = CommandHandler(mock_agent, custom_command_paths=[command_file])
+        assert "/bad" not in handler.get_completions("/b")
+        errors = handler.get_custom_command_errors()
+        assert any("{args}" in message for message in errors)
 
 
 class TestModelCommand:

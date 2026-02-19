@@ -63,6 +63,10 @@ class CommandRegistry:
         """
         return self._commands.get(name)
 
+    def remove(self, name: str) -> None:
+        """移除命令（如果存在）。"""
+        self._commands.pop(name, None)
+
     def get_all_names(self) -> list[str]:
         """获取所有命令名称。
 

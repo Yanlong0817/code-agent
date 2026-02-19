@@ -5,7 +5,7 @@
 ## ✨ 核心特性
 
 - 🔧 **插件化工具系统** - 12 个内置工具，易于扩展
-- 💬 **交互式命令** - 10 个内置命令，支持会话管理
+- 💬 **交互式命令** - 11 个内置命令，支持会话管理
 - 🔒 **安全检查** - 危险操作自动检测和确认
 - 📝 **会话管理** - 保存/加载对话历史
 - 🎨 **Markdown 输出** - 终端友好的渲染展示
@@ -42,11 +42,40 @@
 | `/model` | 切换 OpenAI 模型 |
 | `/tools` | 列出所有可用工具 |
 | `/diff` | 显示本次会话文件变更 |
+| `/commands [list|reload|init]` | 管理自定义命令 |
 | `/save [title]` | 保存当前会话 |
 | `/load <id>` | 加载历史会话 |
 | `/sessions` | 列出所有会话 |
 | `/history` | 显示对话历史 |
 | `/export <path>` | 导出会话到文件 |
+
+### 自定义命令（TOML）
+
+支持从以下路径加载命令定义（项目级覆盖全局同名命令）：
+
+- `~/.code_agent/commands.toml`
+- `<工作目录>/.code_agent/commands.toml`
+
+示例：
+
+```toml
+[commands.review]
+description = "审查改动风险"
+prompt = "请审查当前改动，重点关注 bug、行为回归与测试缺口。"
+
+[commands.explain]
+description = "解释一个概念"
+prompt = "请用中文解释：{args}"
+requires_args = true
+```
+
+使用方式：
+
+- `/review`
+- `/explain CAP theorem`
+- `/commands list`
+- `/commands reload`
+- `/commands init`
 
 ## 安装
 
@@ -243,6 +272,7 @@ code_agent/
 │   │   ├── base.py             # 命令基类和注册表
 │   │   ├── handler.py          # 命令处理器
 │   │   ├── clear.py            # /clear 命令
+│   │   ├── commands.py         # /commands 命令
 │   │   ├── diff.py             # /diff 命令
 │   │   ├── export.py           # /export 命令
 │   │   ├── help.py             # /help 命令
@@ -364,7 +394,7 @@ ruff format src/
 - **代码行数**: ~3000+ 行 Python 代码
 - **测试覆盖**: 9 个测试文件，覆盖核心功能
 - **工具数量**: 12 个内置工具
-- **命令数量**: 10 个交互式命令
+- **命令数量**: 11 个交互式命令
 
 ## 🏗️ 架构设计
 
