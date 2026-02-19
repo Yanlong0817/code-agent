@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Project Overview
 
-Code Agent 是一个基于 Claude API 的智能代码助手，采用插件化工具架构，支持文件操作、系统交互、网络工具和会话管理。
+Code Agent 是一个基于 OpenAI API 的智能代码助手，采用插件化工具架构，支持文件操作、系统交互、网络工具和会话管理。
 
 ## Development Commands
 
@@ -25,7 +25,7 @@ code-agent
 code-agent "你的提示"
 
 # 指定模型
-code-agent -m claude-opus-4-5-20251101 "你的提示"
+code-agent -m gpt-4.1 "你的提示"
 
 # 加载会话
 code-agent --load <session_id>
@@ -65,7 +65,7 @@ ruff format src/
 
 Agent 的核心是一个异步迭代循环：
 1. 接收用户输入 → 添加到消息历史
-2. 调用 Claude API（流式）→ 实时渲染 Markdown
+2. 调用 OpenAI API（流式）→ 实时渲染 Markdown
 3. 解析响应中的工具调用
 4. 执行工具 → 收集结果
 5. 将工具结果添加到消息历史
@@ -93,12 +93,12 @@ class BaseTool(ABC):
         pass
 
     @classmethod
-    def get_schema(cls) -> dict:  # 自动生成 Claude API schema
+    def get_schema(cls) -> dict:  # 自动生成工具 schema
         pass
 ```
 
 **关键设计**：
-- 使用 Pydantic 模型自动生成 Claude API 工具 schema
+- 使用 Pydantic 模型自动生成工具 schema
 - `ToolRegistry` 管理工具注册和执行
 - 输入验证在 `__call__` 中自动完成
 - 工具执行结果自动转换为字符串（如果需要）
@@ -134,7 +134,7 @@ class BaseTool(ABC):
     "id": "20240101_120000_123456",
     "created_at": "2024-01-01T12:00:00",
     "updated_at": "2024-01-01T12:30:00",
-    "model": "claude-sonnet-4-20250514",
+    "model": "gpt-4.1",
     "message_count": 10,
     "title": "可选标题"
   },
@@ -174,12 +174,12 @@ class BaseTool(ABC):
 配置通过环境变量或 `.env` 文件加载（使用 `pydantic-settings`）：
 
 **必需**：
-- `ANTHROPIC_API_KEY`: Claude API 密钥
+- `OPENAI_API_KEY`: OpenAI API 密钥
 
 **可选**：
-- `ANTHROPIC_BASE_URL`: API 基础 URL（用于代理）
+- `OPENAI_BASE_URL`: API 基础 URL（用于代理）
 - `TAVILY_API_KEY`: 网络搜索 API 密钥
-- `CODE_AGENT_MODEL`: 模型名称（默认：claude-sonnet-4-20250514）
+- `CODE_AGENT_MODEL`: 模型名称（默认：gpt-4.1）
 - `CODE_AGENT_MAX_TOKENS`: 最大响应 token（默认：4096）
 - `CODE_AGENT_MAX_ITERATIONS`: 最大迭代次数（默认：50）
 - `CODE_AGENT_AUTO_COMPACT`: 是否启用上下文自动压缩（默认：true）
@@ -212,7 +212,7 @@ class BaseTool(ABC):
 - 用户可见输出使用 Rich Console，不使用 logging
 
 ### Error Handling in Tools
-工具执行错误在 `_execute_tool_calls()` 中统一捕获，返回带 `is_error: True` 的工具结果给 Claude。不要在工具内部捕获所有异常。
+工具执行错误在 `_execute_tool_calls()` 中统一捕获，返回带 `is_error: True` 的工具结果给模型。不要在工具内部捕获所有异常。
 
 ### UTF-8 Encoding Handling
 处理子进程输出和文件内容时必须正确处理 UTF-8 编码错误：
@@ -268,7 +268,7 @@ class BaseTool(ABC):
 ## Dependencies
 
 核心依赖：
-- `anthropic`: Claude API SDK
+- `openai`: OpenAI API SDK
 - `pydantic`: 数据验证和配置管理
 - `httpx`: HTTP 客户端（用于网络工具）
 - `tavily-python`: 网络搜索 API
@@ -285,6 +285,6 @@ class BaseTool(ABC):
 
 - 项目使用 `uv` 作为包管理器，不使用 `pip` 或 `poetry`
 - 所有中文注释和文档遵循用户的全局编码规范
-- 工具的 `description` 字段会直接传给 Claude，需要清晰描述工具功能和参数
+- 工具的 `description` 字段会直接传给模型，需要清晰描述工具功能和参数
 - 流式输出使用 `Rich Live` 实时渲染 Markdown，提供更好的用户体验
 - 会话文件使用 JSON 格式，便于手动查看和编辑

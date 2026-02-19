@@ -90,6 +90,10 @@ class CheckpointStore:
                 return self._entries.pop(idx)
         return None
 
+    def get_all(self) -> list[FileCheckpoint]:
+        """返回所有检查点的只读副本。"""
+        return list(self._entries)
+
     def size(self) -> int:
         """当前检查点数量。"""
         return len(self._entries)

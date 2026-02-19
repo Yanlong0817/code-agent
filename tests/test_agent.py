@@ -16,6 +16,7 @@ def _make_agent_for_unit_tests() -> CodeAgent:
         auto_compact_keep_recent_messages=4,
         auto_compact_summary_max_tokens=512,
         model="gpt-4.1",
+        max_tokens=4096,
     )
     agent.status_bar = StatusBar(
         model="gpt-4.1",
@@ -80,3 +81,55 @@ async def test_maybe_compact_context_swallow_errors() -> None:
     await agent._maybe_compact_context(180_000, reason="post_turn")
 
     agent._compact_context.assert_called_once_with(reason="post_turn")
+
+
+async def test_call_api_stream_enables_include_usage() -> None:
+    """测试流式请求显式开启 usage，并正确读取 token 统计。"""
+    agent = _make_agent_for_unit_tests()
+    agent.messages = [{"role": "user", "content": "hello"}]
+    agent._to_openai_messages = MagicMock(return_value=[{"role": "user", "content": "hello"}])  # type: ignore[method-assign]
+    agent._to_openai_tools = MagicMock(return_value=[])  # type: ignore[method-assign]
+
+    completion = SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(tool_calls=[]))],
+        usage=SimpleNamespace(prompt_tokens=12, completion_tokens=7),
+    )
+
+    class _FakeStream:
+        def __init__(self, final_completion: SimpleNamespace) -> None:
+            self._final_completion = final_completion
+            self._events = [SimpleNamespace(type="content.delta", delta="Hello")]
+            self._index = 0
+
+        async def __aenter__(self) -> "_FakeStream":
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def __aiter__(self) -> "_FakeStream":
+            return self
+
+        async def __anext__(self) -> SimpleNamespace:
+            if self._index >= len(self._events):
+                raise StopAsyncIteration
+            event = self._events[self._index]
+            self._index += 1
+            return event
+
+        async def get_final_completion(self) -> SimpleNamespace:
+            return self._final_completion
+
+    stream_mock = MagicMock(return_value=_FakeStream(completion))
+    agent.client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(stream=stream_mock))
+    )
+
+    response = await agent._call_api_stream()
+
+    stream_mock.assert_called_once()
+    call_kwargs = stream_mock.call_args.kwargs
+    assert call_kwargs["stream_options"] == {"include_usage": True}
+    assert response.text == "Hello"
+    assert response.input_tokens == 12
+    assert response.output_tokens == 7

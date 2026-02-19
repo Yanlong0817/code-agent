@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from code_agent.commands.base import BaseCommand, CommandRegistry
 from code_agent.commands.clear import ClearCommand
+from code_agent.commands.diff import DiffCommand
 from code_agent.commands.export import ExportCommand
 from code_agent.commands.help import HelpCommand
 from code_agent.commands.history import HistoryCommand
@@ -39,6 +40,7 @@ class CommandHandler:
         self.registry.register(ToolsCommand)
         self.registry.register(HistoryCommand)
         self.registry.register(ExportCommand)
+        self.registry.register(DiffCommand)
 
         # 会话管理命令
         self.registry.register(SaveCommand)

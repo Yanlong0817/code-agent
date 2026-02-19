@@ -2,6 +2,7 @@
 
 from code_agent.commands.base import BaseCommand, CommandRegistry
 from code_agent.commands.clear import ClearCommand
+from code_agent.commands.diff import DiffCommand
 from code_agent.commands.export import ExportCommand
 from code_agent.commands.handler import CommandHandler
 from code_agent.commands.help import HelpCommand
@@ -16,6 +17,7 @@ __all__ = [
     "CommandHandler",
     # 具体命令
     "ClearCommand",
+    "DiffCommand",
     "ExportCommand",
     "HelpCommand",
     "HistoryCommand",

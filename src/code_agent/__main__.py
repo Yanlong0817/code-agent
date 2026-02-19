@@ -5,6 +5,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+from openai import APIConnectionError, APIStatusError, APITimeoutError
 from rich.console import Console
 
 from code_agent import __version__
@@ -205,9 +206,23 @@ async def run_interactive(agent: CodeAgent, console: Console) -> None:
             # 处理可能的编码问题
             error_msg = str(e).encode("utf-8", errors="replace").decode("utf-8")
             console.print(f"[red]错误：{error_msg}[/red]")
-            console.print(
-                "[dim]*** You may need to add PYTHONIOENCODING=utf-8 to your environment ***[/dim]"
-            )
+
+            if isinstance(e, (UnicodeEncodeError, UnicodeDecodeError)):
+                console.print(
+                    "[dim]*** You may need to add "
+                    "PYTHONIOENCODING=utf-8 to your environment ***[/dim]"
+                )
+            elif isinstance(e, APIStatusError) and e.status_code == 503:
+                base_url = getattr(agent.config, "openai_base_url", None)
+                if base_url:
+                    console.print(
+                        "[yellow]上游服务返回 503。请检查 OPENAI_BASE_URL 是否可用："
+                        f"{base_url}[/yellow]"
+                    )
+                else:
+                    console.print("[yellow]OpenAI 服务暂时不可用（503），稍后重试。[/yellow]")
+            elif isinstance(e, (APITimeoutError, APIConnectionError)):
+                console.print("[yellow]网络连接异常，请检查网络或代理配置。[/yellow]")
 
 
 def main() -> None:

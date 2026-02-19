@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from openai import AsyncOpenAI
 from rich.console import Console
-from rich.markdown import Markdown
 
 from code_agent.config import Config
 from code_agent.logging import get_logger
@@ -134,6 +133,7 @@ class CodeAgent:
         """注册所有可用工具。"""
         workspace = self.config.working_directory
         checkpoint_store = CheckpointStore()
+        self.checkpoint_store = checkpoint_store
 
         # 文件操作
         self.registry.register(ReadTool(working_directory=workspace))
@@ -322,51 +322,62 @@ class CodeAgent:
         self.console.print(compact_msg)
 
     async def _call_api_stream(self) -> _ModelResponse:
-        """调用 OpenAI Chat Completions API。"""
-        response = await self.client.chat.completions.create(
+        """调用 OpenAI Chat Completions API（流式输出）。"""
+        accumulated_text = ""
+
+        async with self.client.chat.completions.stream(
             model=self.config.model,
             max_tokens=self.config.max_tokens,
             messages=cast(Any, self._to_openai_messages(self.messages)),
             tools=cast(Any, self._to_openai_tools()),
             tool_choice="auto",
-        )
+            stream_options={"include_usage": True},
+        ) as stream:
+            async for event in stream:
+                if event.type == "content.delta":
+                    chunk = self._clean_text(event.delta)
+                    if chunk:
+                        accumulated_text += chunk
+                        self.console.print(chunk, end="", markup=False, highlight=False)
 
-        choice = response.choices[0]
-        message = choice.message
+            completion = await stream.get_final_completion()
 
-        raw_text = message.content or ""
-        accumulated_text = self._clean_text(raw_text)
         if accumulated_text:
-            self.console.print(Markdown(accumulated_text))
+            self.console.print()
+
+        choice = completion.choices[0] if completion.choices else None
 
         parsed_tool_calls: list[_OpenAIToolCall] = []
-        for index, tool_call in enumerate(message.tool_calls or []):
-            tool_name = tool_call.function.name or ""
-            if not tool_name:
-                continue
+        stop_reason = "stop"
 
-            raw_arguments = tool_call.function.arguments or "{}"
-            try:
-                parsed_arguments = json.loads(raw_arguments) if raw_arguments else {}
-            except json.JSONDecodeError:
-                logger.warning("工具参数不是合法 JSON，将作为原始字符串传递: %s", raw_arguments)
-                parsed_arguments = {"_raw_arguments": raw_arguments}
+        if choice:
+            stop_reason = choice.finish_reason or "stop"
+            for index, tool_call in enumerate(choice.message.tool_calls or []):
+                tool_name = tool_call.function.name or ""
+                if not tool_name:
+                    continue
 
-            if not isinstance(parsed_arguments, dict):
-                parsed_arguments = {"_value": parsed_arguments}
+                raw_arguments = tool_call.function.arguments or "{}"
+                try:
+                    parsed_arguments = json.loads(raw_arguments) if raw_arguments else {}
+                except json.JSONDecodeError:
+                    logger.warning("工具参数不是合法 JSON，将作为原始字符串传递: %s", raw_arguments)
+                    parsed_arguments = {"_raw_arguments": raw_arguments}
 
-            parsed_tool_calls.append(
-                _OpenAIToolCall(
-                    id=tool_call.id or f"tool_call_{index + 1}",
-                    name=tool_name,
-                    input=parsed_arguments,
+                if not isinstance(parsed_arguments, dict):
+                    parsed_arguments = {"_value": parsed_arguments}
+
+                parsed_tool_calls.append(
+                    _OpenAIToolCall(
+                        id=tool_call.id or f"tool_call_{index + 1}",
+                        name=tool_name,
+                        input=parsed_arguments,
+                    )
                 )
-            )
 
-        usage = getattr(response, "usage", None)
+        usage = getattr(completion, "usage", None)
         input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
         output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
-        stop_reason = choice.finish_reason or "stop"
 
         return _ModelResponse(
             text=accumulated_text,
