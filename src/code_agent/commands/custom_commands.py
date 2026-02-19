@@ -85,9 +85,7 @@ def load_custom_commands(
 
             unknown_fields = sorted(set(raw_spec.keys()) - ALLOWED_COMMAND_FIELDS)
             if unknown_fields:
-                errors.append(
-                    f"{path}: 命令 '{name}' 包含未知字段：{', '.join(unknown_fields)}"
-                )
+                errors.append(f"{path}: 命令 '{name}' 包含未知字段：{', '.join(unknown_fields)}")
 
             prompt = raw_spec.get("prompt")
             if not isinstance(prompt, str) or not prompt.strip():

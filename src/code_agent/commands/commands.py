@@ -50,9 +50,7 @@ class CommandsCommand(BaseCommand):
                 for error in errors[:10]:
                     self.agent.console.print(f"[dim]- {error}[/dim]")
                 if len(errors) > 10:
-                    self.agent.console.print(
-                        f"[dim]... 其余 {len(errors) - 10} 条告警已省略[/dim]"
-                    )
+                    self.agent.console.print(f"[dim]... 其余 {len(errors) - 10} 条告警已省略[/dim]")
             return
 
         if subcommand == "init":
