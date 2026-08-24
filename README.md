@@ -1,3 +1,5 @@
+
+
 # Code Agent
 
 一个基于 OpenAI API 的智能代码助手，采用插件化工具架构，支持文件操作、系统交互、网络工具和会话管理。
@@ -298,6 +300,7 @@ code_agent/
 │   └── utils/                  # 工具函数
 │       └── diff.py             # Diff 生成工具
 └── tests/                      # 测试套件
+    ├── test_agent.py
     ├── test_config.py
     ├── test_tools_*.py
     ├── test_commands.py
